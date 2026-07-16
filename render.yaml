@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: map-estate
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: MOLIT_SERVICE_KEY
+        sync: false
+      - key: KAKAO_REST_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/estate.db
+      - key: PYTHONUNBUFFERED
+        value: "1"

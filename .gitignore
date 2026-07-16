@@ -1,0 +1,11 @@
+.DS_Store
+backend/.venv/
+backend/data/
+backend/.env
+app/build/
+app/.dart_tool/
+app/.flutter-plugins-dependencies
+*.db
+*.iml
+.idea/
+.vscode/
