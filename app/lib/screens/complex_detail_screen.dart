@@ -233,7 +233,7 @@ class _ComplexDetailScreenState extends ConsumerState<ComplexDetailScreen> {
                 const SizedBox(height: 6),
                 Text(
                   '실거래는 이 앱, 호가는 네이버·직방입니다. '
-                  '지도는 해당 단지 좌표(또는 구 중심)로 엽니다.',
+                  'PC는 단지 좌표로 네이버 지도를 엽니다.',
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.4,
@@ -267,6 +267,12 @@ class _ComplexDetailScreenState extends ConsumerState<ComplexDetailScreen> {
                           _openExternal(ListingLinks.zigbang(detail)),
                       icon: const Icon(Icons.home_work_outlined, size: 18),
                       label: const Text('직방'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          _openExternal(ListingLinks.naverMobile(detail)),
+                      icon: const Icon(Icons.phone_iphone, size: 18),
+                      label: const Text('네이버(모바일)'),
                     ),
                     OutlinedButton.icon(
                       onPressed: () =>

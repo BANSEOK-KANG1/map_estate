@@ -2,9 +2,9 @@ import 'package:map_estate_app/models/models.dart';
 
 /// 실시간 호가 포털 딥링크 (스크래핑 없음).
 ///
-/// 네이버 PC(fin.land)는 `lat`/`lon` 쿼리를 무시하고 기본 위치(시청)로
-/// 떨어지는 경우가 많아, 좌표는 **m.land path** (`/map/lat:lon:z:cortar`)를
-/// 1순위로 씁니다. 검색어에는 존재하지 않는 데모 단지명을 넣지 않습니다.
+/// fin.land(PC) 지도 중심은 `lat`/`lon`이 아니라
+/// `center={경도}-{위도}` (기본값=시청 126.9779-37.5665).
+/// m.land(모바일)는 `/map/{위도}:{경도}:{줌}:{cortar}/유형/거래`.
 class ListingLinks {
   ListingLinks._();
 
@@ -64,7 +64,6 @@ class ListingLinks {
     '중랑구': '1126000000',
   };
 
-  /// UI에 보여줄 검색 힌트 (단지명은 참고용).
   static String queryFor(ComplexSummary c) {
     final parts = <String>[
       '서울',
@@ -77,7 +76,6 @@ class ListingLinks {
     return parts.join(' ').trim();
   }
 
-  /// 네이버 지역 검색용 — 존재하지 않는 단지명 제외 (검색 실패 시 시청 폴백 방지).
   static String _placeQuery(ComplexSummary c) {
     final parts = <String>[
       '서울',
@@ -92,7 +90,20 @@ class ListingLinks {
     return _regionCenter[c.regionName];
   }
 
-  /// m.land 부동산 유형 코드
+  /// fin.land realEstateTypes
+  static String _finPropertyTypes(ComplexSummary c) {
+    switch (c.housingType) {
+      case 'officetel':
+        return 'A02-C01';
+      case 'villa':
+        return 'C02-C01';
+      case 'multi':
+        return 'C03-C01-C02';
+      default:
+        return 'C01-A02';
+    }
+  }
+
   static String _mPropertyTypes(ComplexSummary c) {
     switch (c.housingType) {
       case 'officetel':
@@ -110,11 +121,19 @@ class ListingLinks {
     return c.dealKind == 'sale' ? 'A1' : 'B2';
   }
 
-  /// 좌표가 path에 들어가 시청 폴백을 막는 m.land 지도 URL.
-  static Uri? _mLandMap(ComplexSummary c) {
-    final coords = _coords(c);
-    if (coords == null) return null;
-    final (lat, lng) = coords;
+  /// PC fin.land — center=경도-위도 (기본값이 시청이라 lat/lon 쓰면 안 됨)
+  static Uri _finLandMap(ComplexSummary c, double lat, double lng) {
+    return Uri.https('fin.land.naver.com', '/map', {
+      'center':
+          '${lng.toStringAsFixed(7)}-${lat.toStringAsFixed(7)}',
+      'zoom': '17',
+      'tradeTypes': _tradeCode(c),
+      'realEstateTypes': _finPropertyTypes(c),
+    });
+  }
+
+  /// 모바일 m.land — path에 위도:경도
+  static Uri _mLandMap(ComplexSummary c, double lat, double lng) {
     final cortar = _cortarNo[c.regionName];
     final loc = cortar == null
         ? '${lat.toStringAsFixed(6)}:${lng.toStringAsFixed(6)}:16'
@@ -124,15 +143,23 @@ class ListingLinks {
     );
   }
 
-  /// 네이버 부동산 — 좌표 기반 지도 (PC에서도 m.land path가 위치를 지킴).
+  /// 네이버 부동산 PC 지도 (fin.land + center)
   static Uri naver(ComplexSummary c) {
-    return _mLandMap(c) ?? naverSearch(c);
+    final coords = _coords(c);
+    if (coords == null) return naverSearch(c);
+    final (lat, lng) = coords;
+    return _finLandMap(c, lat, lng);
   }
 
-  /// 모바일 지도 (동일 path; 버튼 라벨용 별칭).
-  static Uri naverMobile(ComplexSummary c) => naver(c);
+  /// 모바일 지도
+  static Uri naverMobile(ComplexSummary c) {
+    final coords = _coords(c);
+    if (coords == null) return naverSearch(c);
+    final (lat, lng) = coords;
+    return _mLandMap(c, lat, lng);
+  }
 
-  /// 구·동 지역 검색 (단지명 제외).
+  /// 구·동 지역 검색 (단지명 제외)
   static Uri naverSearch(ComplexSummary c) {
     final q = Uri.encodeComponent(_placeQuery(c));
     return Uri.parse('https://m.land.naver.com/search/result/$q');
