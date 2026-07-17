@@ -12,6 +12,31 @@ map_estate/
   docs/         API 키·환경 가이드
 ```
 
+## 배포
+
+### 로컬 터널 (즉시 공개 URL)
+
+백엔드가 `8000`에서 떠 있을 때:
+
+```bash
+npx localtunnel --port 8000
+```
+
+### Render (상시 배포)
+
+1. 이 리포를 GitHub에 push
+2. [Render](https://render.com) → New → Blueprint → `render.yaml` 선택
+3. Environment에 `MOLIT_SERVICE_KEY` 입력
+4. 배포 후 `/api/health` 확인, 필요 시 `POST /api/ingest` 로 실거래 수집
+
+웹 UI는 FastAPI가 `/` 에서 같이 서빙합니다 (`backend/static/web`).
+
+웹 다시 빌드 후 동기화:
+
+```bash
+bash backend/scripts/sync_web.sh
+```
+
 ## 빠른 시작 (데모 데이터)
 
 API 키 없이도 서울 주요 단지 데모 데이터로 UI를 확인할 수 있습니다.
