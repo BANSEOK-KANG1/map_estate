@@ -33176,13 +33176,18 @@ return A.cq("https://m.land.naver.com/map/"+n+"/"+p+"/"+o,0,null)},
 b9g(a){var s=A.aR7(a)
 if(s!=null)return A.cq("https://www.zigbang.com/home/oneroom/map?lat="+A.l(s.a)+"&lng="+A.l(s.b)+"&zoom=3",0,null)
 return A.b_t("https","www.zigbang.com","/search/map",A.ay(["keyword",A.Ts(a)],t.N,t.z))},
-aTn(a){var s=0,r=A.L(t.y),q,p,o
+aTn(a){var s=0,r=A.L(t.y),q,p,o,n
 var $async$aTn=A.M(function(b,c){if(b===1)return A.I(c,r)
 for(;;)switch(s){case 0:p=a.k(0)
 o=v.G
-if(o.window.open(p,"_blank","noopener,noreferrer")!=null){q=!0
-s=1
-break}o.window.location.assign(p)
+n=o.document.createElement("a")
+n.href=p
+n.target="_blank"
+n.rel="noopener noreferrer"
+o=o.document.body
+if(o!=null)o.append(n)
+n.click()
+n.remove()
 q=!0
 s=1
 break
