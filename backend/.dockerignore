@@ -1,6 +1,7 @@
-backend/.venv/
-backend/.env
+.venv/
+.env
 __pycache__/
 *.pyc
-data/
+# SQLite runtime folder only — keep app/data package
+/data/
 .pytest_cache/

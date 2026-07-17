@@ -2,7 +2,8 @@
 __pycache__/
 *.py[cod]
 .env
-data/
+# SQLite runtime DB only — do not ignore app/data (Python package)
+/data/
 *.db
 .pytest_cache/
 .mypy_cache/
