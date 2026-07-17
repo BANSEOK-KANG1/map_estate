@@ -52,6 +52,18 @@ async def lifespan(_app: FastAPI):
         raw = settings.database_url.split("///")[-1]
         Path(raw).parent.mkdir(parents=True, exist_ok=True)
     await init_db()
+    # Render free disk is ephemeral — bootstrap demo when empty and no MOLIT key.
+    if not settings.molit_service_key.strip():
+        from sqlalchemy import func, select
+
+        from app.db import SessionLocal
+        from app.models import Complex
+        from app.routers.demo import run_demo_seed
+
+        async with SessionLocal() as db:
+            count = await db.scalar(select(func.count()).select_from(Complex))
+            if not count:
+                await run_demo_seed(db, count=160)
     yield
 
 

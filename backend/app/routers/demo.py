@@ -232,8 +232,8 @@ async def list_stations():
     ]
 
 
-@router.post("/seed")
-async def seed_demo(db: AsyncSession = Depends(get_db), count: int = 160):
+async def run_demo_seed(db: AsyncSession, count: int = 160) -> dict:
+    """Reset DB and load demo listings. Used by HTTP + startup bootstrap."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
@@ -330,3 +330,8 @@ async def seed_demo(db: AsyncSession = Depends(get_db), count: int = 160):
         ),
         "latest_month_seed": latest_trade.strftime("%Y-%m"),
     }
+
+
+@router.post("/seed")
+async def seed_demo(db: AsyncSession = Depends(get_db), count: int = 160):
+    return await run_demo_seed(db, count=count)
