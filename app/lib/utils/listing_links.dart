@@ -2,13 +2,9 @@ import 'package:map_estate_app/models/models.dart';
 
 /// 실시간 호가 포털 딥링크 (스크래핑 없음).
 ///
-/// 네이버 PC(fin.land) 쿼리:
-/// - tradeTypes: A1 매매 / B1 전세 / B2 월세 (구분자 `-`)
-/// - realEstateTypes: A01 아파트 / A02 오피스텔 / A04 재건축 /
-///   C01 원룸 / C02 빌라 / C03 단독다가구 (구분자 `-`)
-///
-/// ※ fin.land 기본값이 매매+전세 / 아파트+재건축이라,
-///    쿼리 없이 열면 월세·원룸이 아님.
+/// 네이버 PC(fin.land)는 `lat`/`lon` 쿼리를 무시하고 기본 위치(시청)로
+/// 떨어지는 경우가 많아, 좌표는 **m.land path** (`/map/lat:lon:z:cortar`)를
+/// 1순위로 씁니다. 검색어에는 존재하지 않는 데모 단지명을 넣지 않습니다.
 class ListingLinks {
   ListingLinks._();
 
@@ -68,15 +64,25 @@ class ListingLinks {
     '중랑구': '1126000000',
   };
 
+  /// UI에 보여줄 검색 힌트 (단지명은 참고용).
   static String queryFor(ComplexSummary c) {
     final parts = <String>[
       '서울',
       if (c.regionName.isNotEmpty) c.regionName,
       if (c.dong.isNotEmpty) c.dong,
-      c.name,
-      if (c.dealKind != 'sale') '월세',
+      if (c.dealKind != 'sale') '월세' else '매매',
       '원룸',
       '오피스텔',
+    ];
+    return parts.join(' ').trim();
+  }
+
+  /// 네이버 지역 검색용 — 존재하지 않는 단지명 제외 (검색 실패 시 시청 폴백 방지).
+  static String _placeQuery(ComplexSummary c) {
+    final parts = <String>[
+      '서울',
+      if (c.regionName.isNotEmpty) c.regionName,
+      if (c.dong.isNotEmpty) c.dong,
     ];
     return parts.join(' ').trim();
   }
@@ -86,21 +92,7 @@ class ListingLinks {
     return _regionCenter[c.regionName];
   }
 
-  /// fin.land realEstateTypes (아파트/재건축 제외)
-  static String _finPropertyTypes(ComplexSummary c) {
-    switch (c.housingType) {
-      case 'officetel':
-        return 'A02-C01'; // 오피스텔-원룸
-      case 'villa':
-        return 'C02-C01'; // 빌라-원룸
-      case 'multi':
-        return 'C03-C01-C02'; // 단독다가구-원룸-빌라
-      default:
-        return 'C01-A02'; // 원룸-오피스텔
-    }
-  }
-
-  /// m.land path 유형 코드
+  /// m.land 부동산 유형 코드
   static String _mPropertyTypes(ComplexSummary c) {
     switch (c.housingType) {
       case 'officetel':
@@ -115,42 +107,34 @@ class ListingLinks {
   }
 
   static String _tradeCode(ComplexSummary c) {
-    // 매매 / 월세(전월세 필터의 호가 교차 기본)
     return c.dealKind == 'sale' ? 'A1' : 'B2';
   }
 
-  /// 네이버 부동산 — PC(fin.land)에 월세·원룸·오피 쿼리 고정
-  static Uri naver(ComplexSummary c) {
+  /// 좌표가 path에 들어가 시청 폴백을 막는 m.land 지도 URL.
+  static Uri? _mLandMap(ComplexSummary c) {
     final coords = _coords(c);
-    final trade = _tradeCode(c);
-    final types = _finPropertyTypes(c);
-    if (coords != null) {
-      final (lat, lng) = coords;
-      return Uri.https('fin.land.naver.com', '/map', {
-        'lat': lat.toString(),
-        'lon': lng.toString(),
-        'zoom': '17',
-        'tradeTypes': trade, // B2=월세
-        'realEstateTypes': types, // C01=원룸, A02=오피스텔
-      });
-    }
-    return naverSearch(c);
-  }
-
-  /// 모바일 m.land (백업) — path에 OR/B2 고정
-  static Uri naverMobile(ComplexSummary c) {
-    final coords = _coords(c);
-    if (coords == null) return naverSearch(c);
+    if (coords == null) return null;
     final (lat, lng) = coords;
     final cortar = _cortarNo[c.regionName];
-    final loc = cortar == null ? '$lat:$lng:17' : '$lat:$lng:17:$cortar';
+    final loc = cortar == null
+        ? '${lat.toStringAsFixed(6)}:${lng.toStringAsFixed(6)}:16'
+        : '${lat.toStringAsFixed(6)}:${lng.toStringAsFixed(6)}:16:$cortar';
     return Uri.parse(
       'https://m.land.naver.com/map/$loc/${_mPropertyTypes(c)}/${_tradeCode(c)}',
     );
   }
 
+  /// 네이버 부동산 — 좌표 기반 지도 (PC에서도 m.land path가 위치를 지킴).
+  static Uri naver(ComplexSummary c) {
+    return _mLandMap(c) ?? naverSearch(c);
+  }
+
+  /// 모바일 지도 (동일 path; 버튼 라벨용 별칭).
+  static Uri naverMobile(ComplexSummary c) => naver(c);
+
+  /// 구·동 지역 검색 (단지명 제외).
   static Uri naverSearch(ComplexSummary c) {
-    final q = Uri.encodeComponent(queryFor(c));
+    final q = Uri.encodeComponent(_placeQuery(c));
     return Uri.parse('https://m.land.naver.com/search/result/$q');
   }
 
@@ -164,7 +148,7 @@ class ListingLinks {
       );
     }
     return Uri.https('www.zigbang.com', '/search/map', {
-      'keyword': queryFor(c),
+      'keyword': _placeQuery(c),
     });
   }
 }

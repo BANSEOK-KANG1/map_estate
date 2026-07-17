@@ -233,7 +233,7 @@ class _ComplexDetailScreenState extends ConsumerState<ComplexDetailScreen> {
                 const SizedBox(height: 6),
                 Text(
                   '실거래는 이 앱, 호가는 네이버·직방입니다. '
-                  '네이버는 PC에서도 월세(B2)·원룸·오피스텔로 엽니다.',
+                  '지도는 해당 단지 좌표(또는 구 중심)로 엽니다.',
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.4,
@@ -242,7 +242,7 @@ class _ComplexDetailScreenState extends ConsumerState<ComplexDetailScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  '검색: ${ListingLinks.queryFor(detail)}',
+                  '지역: ${ListingLinks.queryFor(detail)}',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -270,15 +270,9 @@ class _ComplexDetailScreenState extends ConsumerState<ComplexDetailScreen> {
                     ),
                     OutlinedButton.icon(
                       onPressed: () =>
-                          _openExternal(ListingLinks.naverMobile(detail)),
-                      icon: const Icon(Icons.phone_iphone, size: 18),
-                      label: const Text('네이버(모바일)'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () =>
                           _openExternal(ListingLinks.naverSearch(detail)),
                       icon: const Icon(Icons.search, size: 18),
-                      label: const Text('네이버 검색'),
+                      label: const Text('네이버 지역검색'),
                     ),
                   ],
                 ),
