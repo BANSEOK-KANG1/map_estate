@@ -5,7 +5,15 @@ backend/.env
 app/build/
 app/.dart_tool/
 app/.flutter-plugins-dependencies
+auction_insight/backend/.venv/
+auction_insight/backend/data/
+auction_insight/backend/.env
+auction_insight/app/build/
+auction_insight/app/.dart_tool/
+auction_insight/app/.flutter-plugins-dependencies
 *.db
 *.iml
 .idea/
 .vscode/
+__pycache__/
+*.pyc

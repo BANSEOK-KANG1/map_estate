@@ -1,0 +1,36 @@
+# Fly.io — Auction Insight (개인용: 유휴 시 자동 중지)
+app = 'auction-insight-app'
+primary_region = 'nrt'
+
+[build]
+  dockerfile = 'backend/Dockerfile'
+
+[env]
+  HOST = '0.0.0.0'
+  CORS_ORIGINS = '*'
+  DATABASE_URL = 'sqlite+aiosqlite:////data/auction.db'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # 접속 없으면 중지 → 거의 안 씀 / 쓸 때만 과금
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '45s'
+    method = 'GET'
+    path = '/api/health'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[mounts]
+  source = 'auction_data'
+  destination = '/data'

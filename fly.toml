@@ -1,0 +1,36 @@
+# Fly.io — Map Estate (deploy from repo root: fly deploy)
+app = 'map-estate-app'
+primary_region = 'nrt'
+
+[build]
+  dockerfile = 'backend/Dockerfile'
+  # Build context = backend/ (Fly uses Dockerfile directory as context)
+
+[env]
+  HOST = '0.0.0.0'
+  CORS_ORIGINS = '*'
+  DATABASE_URL = 'sqlite+aiosqlite:////data/estate.db'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/api/health'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[mounts]
+  source = 'estate_data'
+  destination = '/data'

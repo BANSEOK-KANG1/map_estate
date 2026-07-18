@@ -1,0 +1,95 @@
+"""서울·경기·인천 시군구 법정동 앞 5자리 코드."""
+
+SEOUL_REGIONS: list[dict[str, str]] = [
+    {"code": "11110", "name": "종로구", "sido": "서울특별시"},
+    {"code": "11140", "name": "중구", "sido": "서울특별시"},
+    {"code": "11170", "name": "용산구", "sido": "서울특별시"},
+    {"code": "11200", "name": "성동구", "sido": "서울특별시"},
+    {"code": "11215", "name": "광진구", "sido": "서울특별시"},
+    {"code": "11230", "name": "동대문구", "sido": "서울특별시"},
+    {"code": "11260", "name": "중랑구", "sido": "서울특별시"},
+    {"code": "11290", "name": "성북구", "sido": "서울특별시"},
+    {"code": "11305", "name": "강북구", "sido": "서울특별시"},
+    {"code": "11320", "name": "도봉구", "sido": "서울특별시"},
+    {"code": "11350", "name": "노원구", "sido": "서울특별시"},
+    {"code": "11380", "name": "은평구", "sido": "서울특별시"},
+    {"code": "11410", "name": "서대문구", "sido": "서울특별시"},
+    {"code": "11440", "name": "마포구", "sido": "서울특별시"},
+    {"code": "11470", "name": "양천구", "sido": "서울특별시"},
+    {"code": "11500", "name": "강서구", "sido": "서울특별시"},
+    {"code": "11530", "name": "구로구", "sido": "서울특별시"},
+    {"code": "11545", "name": "금천구", "sido": "서울특별시"},
+    {"code": "11560", "name": "영등포구", "sido": "서울특별시"},
+    {"code": "11590", "name": "동작구", "sido": "서울특별시"},
+    {"code": "11620", "name": "관악구", "sido": "서울특별시"},
+    {"code": "11650", "name": "서초구", "sido": "서울특별시"},
+    {"code": "11680", "name": "강남구", "sido": "서울특별시"},
+    {"code": "11710", "name": "송파구", "sido": "서울특별시"},
+    {"code": "11740", "name": "강동구", "sido": "서울특별시"},
+]
+
+GYEONGGI_REGIONS: list[dict[str, str]] = [
+    {"code": "41111", "name": "수원시 장안구", "sido": "경기도"},
+    {"code": "41113", "name": "수원시 권선구", "sido": "경기도"},
+    {"code": "41115", "name": "수원시 팔달구", "sido": "경기도"},
+    {"code": "41117", "name": "수원시 영통구", "sido": "경기도"},
+    {"code": "41131", "name": "성남시 수정구", "sido": "경기도"},
+    {"code": "41133", "name": "성남시 중원구", "sido": "경기도"},
+    {"code": "41135", "name": "성남시 분당구", "sido": "경기도"},
+    {"code": "41150", "name": "의정부시", "sido": "경기도"},
+    {"code": "41171", "name": "안양시 만안구", "sido": "경기도"},
+    {"code": "41173", "name": "안양시 동안구", "sido": "경기도"},
+    {"code": "41190", "name": "부천시", "sido": "경기도"},
+    {"code": "41210", "name": "광명시", "sido": "경기도"},
+    {"code": "41220", "name": "평택시", "sido": "경기도"},
+    {"code": "41250", "name": "동두천시", "sido": "경기도"},
+    {"code": "41271", "name": "안산시 상록구", "sido": "경기도"},
+    {"code": "41273", "name": "안산시 단원구", "sido": "경기도"},
+    {"code": "41281", "name": "고양시 덕양구", "sido": "경기도"},
+    {"code": "41285", "name": "고양시 일산동구", "sido": "경기도"},
+    {"code": "41287", "name": "고양시 일산서구", "sido": "경기도"},
+    {"code": "41290", "name": "과천시", "sido": "경기도"},
+    {"code": "41310", "name": "구리시", "sido": "경기도"},
+    {"code": "41360", "name": "남양주시", "sido": "경기도"},
+    {"code": "41370", "name": "오산시", "sido": "경기도"},
+    {"code": "41390", "name": "시흥시", "sido": "경기도"},
+    {"code": "41410", "name": "군포시", "sido": "경기도"},
+    {"code": "41430", "name": "의왕시", "sido": "경기도"},
+    {"code": "41450", "name": "하남시", "sido": "경기도"},
+    {"code": "41461", "name": "용인시 처인구", "sido": "경기도"},
+    {"code": "41463", "name": "용인시 기흥구", "sido": "경기도"},
+    {"code": "41465", "name": "용인시 수지구", "sido": "경기도"},
+    {"code": "41480", "name": "파주시", "sido": "경기도"},
+    {"code": "41500", "name": "이천시", "sido": "경기도"},
+    {"code": "41550", "name": "안성시", "sido": "경기도"},
+    {"code": "41570", "name": "김포시", "sido": "경기도"},
+    {"code": "41590", "name": "화성시", "sido": "경기도"},
+    {"code": "41610", "name": "광주시", "sido": "경기도"},
+    {"code": "41630", "name": "양주시", "sido": "경기도"},
+    {"code": "41650", "name": "포천시", "sido": "경기도"},
+    {"code": "41670", "name": "여주시", "sido": "경기도"},
+    {"code": "41800", "name": "연천군", "sido": "경기도"},
+    {"code": "41820", "name": "가평군", "sido": "경기도"},
+    {"code": "41830", "name": "양평군", "sido": "경기도"},
+]
+
+INCHEON_REGIONS: list[dict[str, str]] = [
+    {"code": "28110", "name": "중구", "sido": "인천광역시"},
+    {"code": "28140", "name": "동구", "sido": "인천광역시"},
+    {"code": "28177", "name": "미추홀구", "sido": "인천광역시"},
+    {"code": "28185", "name": "연수구", "sido": "인천광역시"},
+    {"code": "28200", "name": "남동구", "sido": "인천광역시"},
+    {"code": "28237", "name": "부평구", "sido": "인천광역시"},
+    {"code": "28245", "name": "계양구", "sido": "인천광역시"},
+    {"code": "28260", "name": "서구", "sido": "인천광역시"},
+    {"code": "28710", "name": "강화군", "sido": "인천광역시"},
+    {"code": "28720", "name": "옹진군", "sido": "인천광역시"},
+]
+
+ALL_REGIONS: list[dict[str, str]] = SEOUL_REGIONS + GYEONGGI_REGIONS + INCHEON_REGIONS
+
+# Address prefixes used to filter Onbid / court lots
+TARGET_SIDO_PREFIXES = ("서울", "경기", "인천")
+
+# Exact sido names for next-gen Onbid `lctnSdnm` filter
+ONBID_SIDO_NAMES = ("서울특별시", "경기도", "인천광역시")

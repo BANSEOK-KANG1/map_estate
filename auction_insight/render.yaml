@@ -1,0 +1,26 @@
+# Auction Insight — Render Blueprint
+# Dashboard: New → Blueprint → 이 파일 선택 (또는 Root Directory = auction_insight)
+services:
+  - type: web
+    name: auction-insight
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - key: ONBID_SERVICE_KEY
+        sync: false
+      - key: MOLIT_SERVICE_KEY
+        sync: false
+      - key: KAKAO_REST_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/auction.db
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: HOST
+        value: "0.0.0.0"

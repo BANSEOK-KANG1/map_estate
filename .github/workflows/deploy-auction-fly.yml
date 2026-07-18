@@ -1,0 +1,37 @@
+name: Deploy Auction Insight (Fly.io)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'auction_insight/backend/**'
+      - 'auction_insight/fly.toml'
+      - 'auction_insight/app/lib/**'
+      - '.github/workflows/deploy-auction-fly.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auction_insight
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Build Flutter web
+        working-directory: auction_insight/app
+        run: |
+          flutter pub get
+          flutter build web --dart-define=API_BASE_URL=
+          mkdir -p ../backend/static
+          rm -rf ../backend/static/web
+          cp -R build/web ../backend/static/web
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy
+        working-directory: auction_insight
+        run: flyctl deploy --remote-only --config fly.toml -a auction-insight-app
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
