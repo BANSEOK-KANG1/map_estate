@@ -156,6 +156,8 @@ class EnrichRequest(BaseModel):
     fetch_pois: bool = True
     fetch_detail: bool = True
     missing_coords_only: bool = False
+    region_codes: list[str] = Field(default_factory=list)
+    balance_by_sido: bool = False  # 서울/경기/인천에 고르게 좌표 부여
 
 
 class HealthOut(BaseModel):

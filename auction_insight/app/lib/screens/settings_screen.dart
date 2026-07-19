@@ -66,11 +66,12 @@ class SettingsScreen extends ConsumerWidget {
                       );
                       try {
                         final res = await ref.read(apiProvider).enrichLots(
-                              limit: 120,
+                              limit: 180,
                               fetchMarket: false,
                               fetchPois: false,
                               fetchDetail: false,
                               missingCoordsOnly: true,
+                              balanceBySido: true,
                             );
                         ref.invalidate(searchProvider);
                         ref.invalidate(healthProvider);

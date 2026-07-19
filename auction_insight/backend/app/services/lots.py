@@ -258,8 +258,13 @@ async def search_lots(session: AsyncSession, req: SearchRequest) -> tuple[int, l
     q = apply_filters(q)
     count_q = apply_filters(count_q)
     total = (await session.execute(count_q)).scalar_one()
+    # Prefer lots with map coords so the map isn't empty while geocode catches up
     q = (
-        q.order_by(AuctionLot.total_score.desc().nullslast(), AuctionLot.bid_end_at.asc().nullslast())
+        q.order_by(
+            AuctionLot.lat.isnot(None).desc(),
+            AuctionLot.total_score.desc().nullslast(),
+            AuctionLot.bid_end_at.asc().nullslast(),
+        )
         .offset(req.offset)
         .limit(min(req.limit, 200))
     )

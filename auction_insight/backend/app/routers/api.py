@@ -111,15 +111,8 @@ async def enrich_existing(
     settings: Settings = Depends(get_settings),
 ) -> IngestResponse:
     """Re-enrich existing lots with Molit market (and Kakao POI if keyed)."""
-    stmt = select(AuctionLot)
-    if req.missing_coords_only:
-        stmt = stmt.where(AuctionLot.lat.is_(None))
-    # Prefer soon-ending lots so list/map (same ordering) get coords first
-    stmt = stmt.order_by(
-        AuctionLot.bid_end_at.asc().nullslast(),
-        AuctionLot.id.asc(),
-    ).limit(max(1, min(req.limit, 200)))
-    lots = (await db.execute(stmt)).scalars().all()
+    limit = max(1, min(req.limit, 200))
+    lots = await _select_lots_for_enrich(db, req, limit)
     if not lots:
         return IngestResponse(status="empty", lot_count=0, message="no lots")
     n = await enrich_lots(
@@ -140,9 +133,63 @@ async def enrich_existing(
             f"(market={req.fetch_market}, "
             f"pois={bool(settings.kakao_rest_key) and req.fetch_pois}, "
             f"detail={bool(settings.onbid_service_key) and req.fetch_detail}, "
-            f"missing_coords_only={req.missing_coords_only})"
+            f"missing_coords_only={req.missing_coords_only}, "
+            f"balance_by_sido={req.balance_by_sido})"
         ),
     )
+
+
+async def _select_lots_for_enrich(
+    db: AsyncSession,
+    req: EnrichRequest,
+    limit: int,
+) -> list[AuctionLot]:
+    """Pick lots for enrich; optionally balance Seoul/Gyeonggi/Incheon."""
+    from app.data.regions import GYEONGGI_REGIONS, INCHEON_REGIONS, SEOUL_REGIONS
+
+    def base_stmt():
+        stmt = select(AuctionLot)
+        if req.missing_coords_only:
+            stmt = stmt.where(AuctionLot.lat.is_(None))
+        if req.region_codes:
+            stmt = stmt.where(AuctionLot.region_code.in_(req.region_codes))
+        return stmt.order_by(
+            AuctionLot.bid_end_at.asc().nullslast(),
+            AuctionLot.id.asc(),
+        )
+
+    if not req.balance_by_sido or req.region_codes:
+        return list((await db.execute(base_stmt().limit(limit))).scalars().all())
+
+    groups = [
+        [r["code"] for r in SEOUL_REGIONS],
+        [r["code"] for r in GYEONGGI_REGIONS],
+        [r["code"] for r in INCHEON_REGIONS],
+    ]
+    per = max(1, limit // len(groups))
+    picked: list[AuctionLot] = []
+    seen: set[int] = set()
+    for codes in groups:
+        stmt = select(AuctionLot)
+        if req.missing_coords_only:
+            stmt = stmt.where(AuctionLot.lat.is_(None))
+        stmt = (
+            stmt.where(AuctionLot.region_code.in_(codes))
+            .order_by(AuctionLot.bid_end_at.asc().nullslast(), AuctionLot.id.asc())
+            .limit(per)
+        )
+        for lot in (await db.execute(stmt)).scalars().all():
+            if lot.id not in seen:
+                picked.append(lot)
+                seen.add(lot.id)
+    if len(picked) < limit:
+        for lot in (await db.execute(base_stmt().limit(limit))).scalars().all():
+            if lot.id not in seen:
+                picked.append(lot)
+                seen.add(lot.id)
+            if len(picked) >= limit:
+                break
+    return picked[:limit]
 
 
 @router.get("/regions", response_model=list[RegionOut])

@@ -105,6 +105,8 @@ class AuctionApi {
     bool fetchPois = false,
     bool fetchDetail = false,
     bool missingCoordsOnly = false,
+    bool balanceBySido = false,
+    List<String> regionCodes = const [],
   }) async {
     final res = await _dio.post(
       '/api/enrich',
@@ -114,6 +116,8 @@ class AuctionApi {
         'fetch_pois': fetchPois,
         'fetch_detail': fetchDetail,
         'missing_coords_only': missingCoordsOnly,
+        'balance_by_sido': balanceBySido,
+        if (regionCodes.isNotEmpty) 'region_codes': regionCodes,
       },
     );
     return Map<String, dynamic>.from(res.data as Map);

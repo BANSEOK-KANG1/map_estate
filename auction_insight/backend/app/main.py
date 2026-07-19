@@ -90,19 +90,38 @@ async def _bootstrap_if_empty() -> None:
             run = await ingest_onbid(session, settings, max_pages=10, page_size=100)
             logger.info("bootstrap ingest: %s lots (%s)", run.lot_count, run.message[:120])
             if settings.kakao_rest_key and run.lot_count > 0:
-                lots = (
-                    await session.execute(
-                        select(AuctionLot)
-                        .where(AuctionLot.lat.is_(None))
-                        .order_by(AuctionLot.bid_end_at.asc().nullslast())
-                        .limit(120)
-                    )
-                ).scalars().all()
-                if lots:
+                from app.data.regions import GYEONGGI_REGIONS, INCHEON_REGIONS, SEOUL_REGIONS
+
+                # Spread geocode across 서울/경기/인천 so map isn't Incheon-only
+                groups = [SEOUL_REGIONS, GYEONGGI_REGIONS, INCHEON_REGIONS]
+                per = 80
+                targets: list = []
+                seen: set[int] = set()
+                for group in groups:
+                    codes = [r["code"] for r in group]
+                    batch = (
+                        await session.execute(
+                            select(AuctionLot)
+                            .where(
+                                AuctionLot.lat.is_(None),
+                                AuctionLot.region_code.in_(codes),
+                            )
+                            .order_by(
+                                AuctionLot.bid_end_at.asc().nullslast(),
+                                AuctionLot.id.asc(),
+                            )
+                            .limit(per)
+                        )
+                    ).scalars().all()
+                    for lot in batch:
+                        if lot.id not in seen:
+                            targets.append(lot)
+                            seen.add(lot.id)
+                if targets:
                     n = await enrich_lots(
                         session,
                         settings,
-                        list(lots),
+                        targets,
                         fetch_market=False,
                         fetch_pois=False,
                         fetch_detail=False,
