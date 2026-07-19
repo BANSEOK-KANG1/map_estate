@@ -46,7 +46,70 @@ class PrivateNetworkCorsMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await init_db()
+    # Free Render has ephemeral disk — refill when waking to an empty DB.
+    try:
+        import asyncio
+
+        from sqlalchemy import func, select
+
+        from app.db import SessionLocal
+        from app.models import AuctionLot
+
+        async with SessionLocal() as session:
+            total = (await session.execute(select(func.count(AuctionLot.id)))).scalar_one()
+        if total == 0:
+            asyncio.create_task(_bootstrap_if_empty())
+    except Exception:  # noqa: BLE001
+        pass
     yield
+
+
+async def _bootstrap_if_empty() -> None:
+    """Background: onbid ingest + light geocode when DB starts empty."""
+    import logging
+
+    from sqlalchemy import func, select
+
+    from app.db import SessionLocal
+    from app.ingest.onbid import ingest_onbid
+    from app.models import AuctionLot
+    from app.services.enrich import enrich_lots
+    from app.services.lots import seed_regions
+
+    logger = logging.getLogger(__name__)
+    settings = get_settings()
+    if not settings.onbid_service_key:
+        logger.warning("bootstrap skipped: ONBID_SERVICE_KEY missing")
+        return
+    try:
+        async with SessionLocal() as session:
+            total = (await session.execute(select(func.count(AuctionLot.id)))).scalar_one()
+            if total > 0:
+                return
+            await seed_regions(session)
+            run = await ingest_onbid(session, settings, max_pages=10, page_size=100)
+            logger.info("bootstrap ingest: %s lots (%s)", run.lot_count, run.message[:120])
+            if settings.kakao_rest_key and run.lot_count > 0:
+                lots = (
+                    await session.execute(
+                        select(AuctionLot)
+                        .where(AuctionLot.lat.is_(None))
+                        .order_by(AuctionLot.bid_end_at.asc().nullslast())
+                        .limit(120)
+                    )
+                ).scalars().all()
+                if lots:
+                    n = await enrich_lots(
+                        session,
+                        settings,
+                        list(lots),
+                        fetch_market=False,
+                        fetch_pois=False,
+                        fetch_detail=False,
+                    )
+                    logger.info("bootstrap geocode: %s lots", n)
+    except Exception:  # noqa: BLE001
+        logger.exception("bootstrap failed")
 
 
 def create_app() -> FastAPI:
