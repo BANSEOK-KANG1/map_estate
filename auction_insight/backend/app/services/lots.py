@@ -285,6 +285,26 @@ async def get_lot(session: AsyncSession, lot_id: int) -> AuctionLot | None:
     return result.scalar_one_or_none()
 
 
+async def get_lot_by_key(
+    session: AsyncSession,
+    source: str,
+    external_id: str,
+) -> AuctionLot | None:
+    result = await session.execute(
+        select(AuctionLot)
+        .options(
+            selectinload(AuctionLot.region),
+            selectinload(AuctionLot.schedules),
+            selectinload(AuctionLot.pois),
+        )
+        .where(
+            AuctionLot.source == source,
+            AuctionLot.external_id == external_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def seed_regions(session: AsyncSession) -> int:
     from app.data.regions import ALL_REGIONS
 
@@ -324,6 +344,7 @@ __all__ = [
     "to_detail",
     "search_lots",
     "get_lot",
+    "get_lot_by_key",
     "seed_regions",
     "match_region_code",
     "combine_insight",

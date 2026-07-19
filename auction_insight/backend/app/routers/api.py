@@ -17,7 +17,7 @@ from app.schemas import (
     SearchResponse,
 )
 from app.services.enrich import enrich_lot, enrich_lots
-from app.services.lots import get_lot, search_lots, seed_regions, to_detail
+from app.services.lots import get_lot, get_lot_by_key, search_lots, seed_regions, to_detail
 
 router = APIRouter(tags=["api"])
 
@@ -206,6 +206,25 @@ async def list_regions(db: AsyncSession = Depends(get_db)) -> list[RegionOut]:
 async def search(req: SearchRequest, db: AsyncSession = Depends(get_db)) -> SearchResponse:
     total, items = await search_lots(db, req)
     return SearchResponse(total=total, items=items)
+
+
+@router.get("/lots/by-key", response_model=LotDetail)
+async def lot_detail_by_key(
+    source: str,
+    external_id: str,
+    enrich: bool = False,
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> LotDetail:
+    """Lookup by stable onbid/court key — survives DB rebuild (new numeric ids)."""
+    lot = await get_lot_by_key(db, source, external_id)
+    if lot is None:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    if enrich:
+        await enrich_lot(db, settings, lot)
+        lot = await get_lot_by_key(db, source, external_id)
+        assert lot is not None
+    return to_detail(lot)
 
 
 @router.get("/lots/{lot_id}", response_model=LotDetail)

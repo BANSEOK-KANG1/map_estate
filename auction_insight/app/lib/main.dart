@@ -17,8 +17,12 @@ final _router = GoRouter(
     GoRoute(
       path: '/lot/:id',
       builder: (context, state) {
-        final id = int.parse(state.pathParameters['id']!);
-        return LotDetailScreen(lotId: id);
+        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        return LotDetailScreen(
+          lotId: id,
+          source: state.uri.queryParameters['source'],
+          externalId: state.uri.queryParameters['ext'],
+        );
       },
     ),
     GoRoute(

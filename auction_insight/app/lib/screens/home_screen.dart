@@ -124,7 +124,9 @@ class HomeScreen extends ConsumerWidget {
                           child: LotMap(
                             items: result.items,
                             height: 240,
-                            onTapLot: (lot) => context.push('/lot/${lot.id}'),
+                            onTapLot: (lot) => context.push(
+                              '/lot/${lot.id}?source=${Uri.encodeComponent(lot.source)}&ext=${Uri.encodeComponent(lot.externalId)}',
+                            ),
                           ),
                         ),
                         Padding(
@@ -155,7 +157,9 @@ class HomeScreen extends ConsumerWidget {
                               final lot = result.items[i];
                               return LotListTile(
                                 lot: lot,
-                                onTap: () => context.push('/lot/${lot.id}'),
+                                onTap: () => context.push(
+                                  '/lot/${lot.id}?source=${Uri.encodeComponent(lot.source)}&ext=${Uri.encodeComponent(lot.externalId)}',
+                                ),
                               );
                             },
                           ),

@@ -69,7 +69,32 @@ class AuctionApi {
     );
   }
 
-  Future<LotDetail> fetchLot(int id, {bool enrich = false}) async {
+  Future<LotDetail> fetchLot(
+    int id, {
+    bool enrich = false,
+    String? source,
+    String? externalId,
+  }) async {
+    // Prefer stable key when available (DB wipe changes numeric ids).
+    if (source != null &&
+        source.isNotEmpty &&
+        externalId != null &&
+        externalId.isNotEmpty) {
+      try {
+        final res = await _dio.get(
+          '/api/lots/by-key',
+          queryParameters: {
+            'source': source,
+            'external_id': externalId,
+            if (enrich) 'enrich': true,
+          },
+        );
+        return LotDetail.fromJson(res.data as Map<String, dynamic>);
+      } on DioException catch (e) {
+        if (e.response?.statusCode != 404) rethrow;
+        // Fall through to numeric id for older clients / edge cases.
+      }
+    }
     final res = await _dio.get(
       '/api/lots/$id',
       queryParameters: {if (enrich) 'enrich': true},

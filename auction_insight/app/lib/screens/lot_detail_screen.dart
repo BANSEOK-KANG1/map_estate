@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:auction_insight_app/models/models.dart';
 import 'package:auction_insight_app/providers/providers.dart';
@@ -8,29 +10,120 @@ import 'package:auction_insight_app/utils/format.dart';
 import 'package:auction_insight_app/widgets/lot_map.dart';
 
 class LotDetailScreen extends ConsumerWidget {
-  const LotDetailScreen({super.key, required this.lotId});
+  const LotDetailScreen({
+    super.key,
+    required this.lotId,
+    this.source,
+    this.externalId,
+  });
 
   final int lotId;
+  final String? source;
+  final String? externalId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(_lotProvider(lotId));
+    final detail = ref.watch(
+      _lotProvider((
+        id: lotId,
+        source: source,
+        externalId: externalId,
+      )),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('물건 상세')),
       body: detail.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => _DetailError(
+          error: e,
+          onRetry: () {
+            ref.invalidate(searchProvider);
+            ref.invalidate(
+              _lotProvider((
+                id: lotId,
+                source: source,
+                externalId: externalId,
+              )),
+            );
+          },
+          onBack: () {
+            ref.invalidate(searchProvider);
+            context.go('/');
+          },
+        ),
         data: (lot) => _DetailBody(lot: lot),
       ),
     );
   }
 }
 
+typedef _LotKey = ({int id, String? source, String? externalId});
+
 final _lotProvider =
-    FutureProvider.autoDispose.family<LotDetail, int>((ref, id) async {
-  return ref.watch(apiProvider).fetchLot(id);
+    FutureProvider.autoDispose.family<LotDetail, _LotKey>((ref, key) async {
+  return ref.watch(apiProvider).fetchLot(
+        key.id,
+        source: key.source,
+        externalId: key.externalId,
+      );
 });
+
+class _DetailError extends StatelessWidget {
+  const _DetailError({
+    required this.error,
+    required this.onRetry,
+    required this.onBack,
+  });
+
+  final Object error;
+  final VoidCallback onRetry;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final is404 = error is DioException &&
+        (error as DioException).response?.statusCode == 404;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              is404 ? Icons.refresh : Icons.error_outline,
+              size: 40,
+              color: AppTheme.ink.withValues(alpha: 0.45),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              is404
+                  ? '물건 정보가 갱신되었습니다'
+                  : '상세를 불러오지 못했습니다',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              is404
+                  ? '서버가 잠들었다 깨면 목록이 다시 만들어집니다.\n목록으로 돌아가 새로고침해 주세요.'
+                  : '$error',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                height: 1.4,
+                color: AppTheme.ink.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(onPressed: onBack, child: const Text('목록으로')),
+            const SizedBox(height: 8),
+            TextButton(onPressed: onRetry, child: const Text('다시 시도')),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _DetailBody extends StatelessWidget {
   const _DetailBody({required this.lot});
