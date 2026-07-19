@@ -149,6 +149,9 @@ async def enrich_existing(
 async def list_regions(db: AsyncSession = Depends(get_db)) -> list[RegionOut]:
     await seed_regions(db)
     rows = (await db.execute(select(Region).order_by(Region.sido, Region.name))).scalars().all()
+    # Prefer 서울 → 경기 → 인천 (alphabetical puts 경기 first)
+    sido_rank = {"서울특별시": 0, "경기도": 1, "인천광역시": 2}
+    rows = sorted(rows, key=lambda r: (sido_rank.get(r.sido, 99), r.name))
     return [RegionOut(code=r.code, name=r.name, sido=r.sido) for r in rows]
 
 

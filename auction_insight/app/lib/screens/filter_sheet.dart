@@ -15,6 +15,8 @@ const kUsageOptions = <String>[
   '토지',
 ];
 
+const kSidoOptions = <String>['서울특별시', '경기도', '인천광역시'];
+
 Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
   final current = ref.read(filtersProvider);
   var sources = List<String>.from(current.sources);
@@ -24,6 +26,14 @@ Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
   final regionsAsync = ref.read(regionsProvider);
   final regions = regionsAsync.valueOrNull ?? [];
   var selectedRegions = List<String>.from(current.regionCodes);
+
+  // Infer sido tabs from already-selected districts; default Seoul first.
+  var sidoFilter = <String>{};
+  for (final code in selectedRegions) {
+    final hit = regions.where((r) => r.code == code);
+    if (hit.isNotEmpty) sidoFilter.add(hit.first.sido);
+  }
+  if (sidoFilter.isEmpty) sidoFilter = {'서울특별시'};
 
   await showModalBottomSheet<void>(
     context: context,
@@ -35,6 +45,10 @@ Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
     builder: (ctx) {
       return StatefulBuilder(
         builder: (ctx, setState) {
+          final visibleRegions = regions
+              .where((r) => sidoFilter.contains(r.sido))
+              .toList();
+
           return Padding(
             padding: EdgeInsets.only(
               left: 20,
@@ -153,16 +167,67 @@ Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
                   ),
                   if (regions.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    const Text('지역 (선택)', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text('지역', style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final sido in kSidoOptions)
+                          FilterChip(
+                            label: Text(
+                              sido.replaceAll('특별시', '').replaceAll('광역시', '').replaceAll('도', ''),
+                            ),
+                            selected: sidoFilter.contains(sido),
+                            onSelected: (v) {
+                              setState(() {
+                                final next = {...sidoFilter};
+                                if (v) {
+                                  next.add(sido);
+                                } else {
+                                  next.remove(sido);
+                                  // Keep at least one sido tab visible
+                                  if (next.isEmpty) next.add(sido);
+                                  // Drop district selections outside visible sidos
+                                  selectedRegions = selectedRegions
+                                      .where((code) {
+                                        final hit = regions.where((r) => r.code == code);
+                                        return hit.isNotEmpty && next.contains(hit.first.sido);
+                                      })
+                                      .toList();
+                                }
+                                sidoFilter = next;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          '시·군·구 (${selectedRegions.length}개 선택)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.ink.withValues(alpha: 0.55),
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => setState(() => selectedRegions = []),
+                          child: const Text('지역 초기화', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ),
                     SizedBox(
-                      height: 160,
-                      child: ListView(
-                        children: regions.take(40).map((r) {
+                      height: 220,
+                      child: ListView.builder(
+                        itemCount: visibleRegions.length,
+                        itemBuilder: (_, i) {
+                          final r = visibleRegions[i];
                           final selected = selectedRegions.contains(r.code);
                           return CheckboxListTile(
                             dense: true,
-                            title: Text('${r.sido} ${r.name}', style: const TextStyle(fontSize: 13)),
+                            title: Text(r.name, style: const TextStyle(fontSize: 13)),
                             value: selected,
                             onChanged: (v) {
                               setState(() {
@@ -175,7 +240,7 @@ Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
                               });
                             },
                           );
-                        }).toList(),
+                        },
                       ),
                     ),
                   ],
