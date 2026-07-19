@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -220,6 +220,14 @@ async def search_lots(session: AsyncSession, req: SearchRequest) -> tuple[int, l
             stmt = stmt.where(AuctionLot.source.in_(req.sources))
         if req.region_codes:
             stmt = stmt.where(AuctionLot.region_code.in_(req.region_codes))
+        if req.usages:
+            usage_filters = [
+                AuctionLot.usage.ilike(f"%{u.strip()}%")
+                for u in req.usages
+                if u and u.strip()
+            ]
+            if usage_filters:
+                stmt = stmt.where(or_(*usage_filters))
         if req.min_price_manwon is not None:
             stmt = stmt.where(AuctionLot.min_bid_manwon >= req.min_price_manwon)
         if req.max_price_manwon is not None:

@@ -103,6 +103,8 @@ class AuctionApi {
     int limit = 50,
     bool fetchMarket = true,
     bool fetchPois = false,
+    bool fetchDetail = false,
+    bool missingCoordsOnly = false,
   }) async {
     final res = await _dio.post(
       '/api/enrich',
@@ -110,6 +112,8 @@ class AuctionApi {
         'limit': limit,
         'fetch_market': fetchMarket,
         'fetch_pois': fetchPois,
+        'fetch_detail': fetchDetail,
+        'missing_coords_only': missingCoordsOnly,
       },
     );
     return Map<String, dynamic>.from(res.data as Map);

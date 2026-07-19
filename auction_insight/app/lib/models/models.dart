@@ -386,6 +386,7 @@ class LegalRisk {
 class SearchFilters {
   final List<String> sources;
   final List<String> regionCodes;
+  final List<String> usages;
   final int? minPriceManwon;
   final int? maxPriceManwon;
   final int? minFailCount;
@@ -395,6 +396,7 @@ class SearchFilters {
   const SearchFilters({
     this.sources = const ['onbid', 'court'],
     this.regionCodes = const [],
+    this.usages = const [],
     this.minPriceManwon,
     this.maxPriceManwon,
     this.minFailCount,
@@ -405,6 +407,7 @@ class SearchFilters {
   SearchFilters copyWith({
     List<String>? sources,
     List<String>? regionCodes,
+    List<String>? usages,
     int? minPriceManwon,
     int? maxPriceManwon,
     int? minFailCount,
@@ -414,6 +417,7 @@ class SearchFilters {
       SearchFilters(
         sources: sources ?? this.sources,
         regionCodes: regionCodes ?? this.regionCodes,
+        usages: usages ?? this.usages,
         minPriceManwon: minPriceManwon ?? this.minPriceManwon,
         maxPriceManwon: maxPriceManwon ?? this.maxPriceManwon,
         minFailCount: minFailCount ?? this.minFailCount,
@@ -424,6 +428,7 @@ class SearchFilters {
   Map<String, dynamic> toJson() => {
         'sources': sources,
         if (regionCodes.isNotEmpty) 'region_codes': regionCodes,
+        if (usages.isNotEmpty) 'usages': usages,
         if (minPriceManwon != null) 'min_price_manwon': minPriceManwon,
         if (maxPriceManwon != null) 'max_price_manwon': maxPriceManwon,
         if (minFailCount != null) 'min_fail_count': minFailCount,

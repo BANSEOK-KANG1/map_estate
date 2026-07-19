@@ -56,7 +56,42 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                 const SizedBox(height: 8),
-                if (h.keys['molit'] == true)
+                if (h.keys['kakao'] == true) ...[
+                  const SizedBox(height: 8),
+                  FilledButton.tonal(
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('지도 좌표 붙이는 중… (1~2분)')),
+                      );
+                      try {
+                        final res = await ref.read(apiProvider).enrichLots(
+                              limit: 120,
+                              fetchMarket: false,
+                              fetchPois: false,
+                              fetchDetail: false,
+                              missingCoordsOnly: true,
+                            );
+                        ref.invalidate(searchProvider);
+                        ref.invalidate(healthProvider);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '좌표 enrich ${res['enriched']}건 · ${res['message'] ?? res['status']}',
+                            ),
+                          ),
+                        );
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('실패: $e')),
+                        );
+                      }
+                    },
+                    child: const Text('지도 좌표 붙이기 (카카오)'),
+                  ),
+                ],
+                if (h.keys['molit'] == true) ...[
+                  const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);
@@ -82,6 +117,7 @@ class SettingsScreen extends ConsumerWidget {
                     },
                     child: const Text('시세 다시 계산 (국토부)'),
                   ),
+                ],
                 if (h.keys['onbid'] == true) ...[
                   const SizedBox(height: 8),
                   FilledButton(

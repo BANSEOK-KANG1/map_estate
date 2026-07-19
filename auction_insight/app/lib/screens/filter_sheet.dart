@@ -4,9 +4,21 @@ import 'package:auction_insight_app/models/models.dart';
 import 'package:auction_insight_app/providers/providers.dart';
 import 'package:auction_insight_app/theme.dart';
 
+const kUsageOptions = <String>[
+  '아파트',
+  '오피스텔',
+  '다가구',
+  '다세대',
+  '근린생활시설',
+  '업무시설',
+  '단독주택',
+  '토지',
+];
+
 Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
   final current = ref.read(filtersProvider);
   var sources = List<String>.from(current.sources);
+  var usages = List<String>.from(current.usages);
   var minFail = current.minFailCount;
   var maxPrice = current.maxPriceManwon;
   final regionsAsync = ref.read(regionsProvider);
@@ -40,7 +52,7 @@ Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 16),
-                  const Text('유형', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text('매각 구분', style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -73,6 +85,37 @@ Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
                           });
                         },
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('건물 유형', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(
+                    '여러 개 선택 가능 · 비우면 전체',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.ink.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      for (final u in kUsageOptions)
+                        FilterChip(
+                          label: Text(u),
+                          selected: usages.contains(u),
+                          onSelected: (v) {
+                            setState(() {
+                              if (v) {
+                                usages = [...usages, u];
+                              } else {
+                                usages = usages.where((e) => e != u).toList();
+                              }
+                            });
+                          },
+                        ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -142,6 +185,7 @@ Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
                       ref.read(filtersProvider.notifier).state = SearchFilters(
                         sources: sources.toSet().toList(),
                         regionCodes: selectedRegions,
+                        usages: usages.toSet().toList(),
                         minFailCount: minFail,
                         maxPriceManwon: maxPrice,
                         status: 'active',

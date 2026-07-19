@@ -44,6 +44,37 @@ def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+def _geocode_query_variants(address: str) -> list[str]:
+    """Strip floor/unit/usage noise so Kakao can match a street address."""
+    import re
+
+    raw = " ".join(address.split()).strip()
+    if not raw:
+        return []
+    variants: list[str] = [raw]
+    cleaned = re.sub(r"\s*제?\d+\s*층\b.*$", "", raw)
+    cleaned = re.sub(r"\s*제?\d+\s*호\b.*$", "", cleaned)
+    cleaned = re.sub(
+        r"\s+(오피스텔|아파트|다세대주택|다세대|다가구|근린생활시설|업무시설|단독주택|연립주택)\b.*$",
+        "",
+        cleaned,
+    )
+    cleaned = cleaned.strip(" ,")
+    if cleaned and cleaned not in variants:
+        variants.append(cleaned)
+    # Keep "시/군/구 … 동 … 번지" head when title is long
+    m = re.match(
+        r"^((?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)"
+        r"[^\d]{0,40}?\d[\d\-]*)",
+        cleaned or raw,
+    )
+    if m:
+        short = m.group(1).strip()
+        if short and short not in variants:
+            variants.append(short)
+    return variants
+
+
 async def geocode_address(
     settings: Settings,
     address: str,
@@ -51,27 +82,28 @@ async def geocode_address(
     if not settings.kakao_rest_key or not address.strip():
         return None
     async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{KAKAO_LOCAL}/search/address.json",
-            params={"query": address},
-            headers=_headers(settings),
-            timeout=20.0,
-        )
-        if resp.status_code != 200:
-            logger.warning("geocode failed: %s %s", resp.status_code, resp.text[:200])
-            return None
-        docs = resp.json().get("documents") or []
-        if not docs:
-            resp2 = await client.get(
-                f"{KAKAO_LOCAL}/search/keyword.json",
-                params={"query": address},
+        for query in _geocode_query_variants(address):
+            resp = await client.get(
+                f"{KAKAO_LOCAL}/search/address.json",
+                params={"query": query},
                 headers=_headers(settings),
                 timeout=20.0,
             )
-            docs = resp2.json().get("documents") or []
-        if not docs:
-            return None
-        return float(docs[0]["y"]), float(docs[0]["x"])
+            if resp.status_code != 200:
+                logger.warning("geocode failed: %s %s", resp.status_code, resp.text[:200])
+                continue
+            docs = resp.json().get("documents") or []
+            if not docs:
+                resp2 = await client.get(
+                    f"{KAKAO_LOCAL}/search/keyword.json",
+                    params={"query": query},
+                    headers=_headers(settings),
+                    timeout=20.0,
+                )
+                docs = resp2.json().get("documents") or []
+            if docs:
+                return float(docs[0]["y"]), float(docs[0]["x"])
+        return None
 
 
 async def ensure_lot_coords(

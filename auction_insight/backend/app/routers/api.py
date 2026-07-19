@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
@@ -111,11 +111,15 @@ async def enrich_existing(
     settings: Settings = Depends(get_settings),
 ) -> IngestResponse:
     """Re-enrich existing lots with Molit market (and Kakao POI if keyed)."""
-    lots = (
-        await db.execute(
-            select(AuctionLot).order_by(AuctionLot.id.asc()).limit(max(1, min(req.limit, 100)))
-        )
-    ).scalars().all()
+    stmt = select(AuctionLot)
+    if req.missing_coords_only:
+        stmt = stmt.where(AuctionLot.lat.is_(None))
+    # Prefer soon-ending lots so list/map (same ordering) get coords first
+    stmt = stmt.order_by(
+        AuctionLot.bid_end_at.asc().nullslast(),
+        AuctionLot.id.asc(),
+    ).limit(max(1, min(req.limit, 200)))
+    lots = (await db.execute(stmt)).scalars().all()
     if not lots:
         return IngestResponse(status="empty", lot_count=0, message="no lots")
     n = await enrich_lots(
@@ -126,15 +130,17 @@ async def enrich_existing(
         fetch_pois=req.fetch_pois and bool(settings.kakao_rest_key),
         fetch_detail=req.fetch_detail and bool(settings.onbid_service_key),
     )
+    with_coords = sum(1 for lot in lots if lot.lat is not None and lot.lng is not None)
     return IngestResponse(
         status="ok",
         lot_count=len(lots),
         enriched=n,
         message=(
-            f"enriched {n} lots "
+            f"enriched {n} lots · coords={with_coords}/{len(lots)} "
             f"(market={req.fetch_market}, "
             f"pois={bool(settings.kakao_rest_key) and req.fetch_pois}, "
-            f"detail={bool(settings.onbid_service_key) and req.fetch_detail})"
+            f"detail={bool(settings.onbid_service_key) and req.fetch_detail}, "
+            f"missing_coords_only={req.missing_coords_only})"
         ),
     )
 

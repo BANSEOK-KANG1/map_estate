@@ -111,6 +111,7 @@ class LotDetail(LotSummary):
 class SearchRequest(BaseModel):
     sources: list[str] = Field(default_factory=lambda: ["onbid", "court"])
     region_codes: list[str] = Field(default_factory=list)
+    usages: list[str] = Field(default_factory=list)  # 오피스텔/다가구 등 (부분일치 OR)
     min_price_manwon: int | None = None
     max_price_manwon: int | None = None
     min_fail_count: int | None = None
@@ -154,6 +155,7 @@ class EnrichRequest(BaseModel):
     fetch_market: bool = True
     fetch_pois: bool = True
     fetch_detail: bool = True
+    missing_coords_only: bool = False
 
 
 class HealthOut(BaseModel):

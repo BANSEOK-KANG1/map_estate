@@ -83,6 +83,11 @@ class HomeScreen extends ConsumerWidget {
                         label: Text(s == 'court' ? '경매' : '공매'),
                         visualDensity: VisualDensity.compact,
                       ),
+                    for (final u in filters.usages)
+                      Chip(
+                        label: Text(u),
+                        visualDensity: VisualDensity.compact,
+                      ),
                     if (filters.minFailCount != null)
                       Chip(
                         label: Text('유찰 ${filters.minFailCount}+'),
