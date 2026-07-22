@@ -147,3 +147,73 @@ class RightFromEvidenceIn(BaseModel):
     kind: str = "other"
     query: str = ""
     amount_won: int | None = None
+    event_date: str | None = None
+    is_malso_baseline: bool = False
+
+
+class RightCreateIn(BaseModel):
+    kind: str = "other"
+    label: str = ""
+    amount_won: int | None = None
+    priority_hint: int | None = None
+    event_date: str | None = None
+    is_malso_baseline: bool = False
+    status: str | None = None
+    evidence_doc_id: int | None = None
+    evidence_page: int | None = None
+    evidence_excerpt: str = ""
+    rule_track: str | None = None
+    notes: str = ""
+    confirm: bool = False
+
+
+class RightPatchIn(BaseModel):
+    kind: str | None = None
+    label: str | None = None
+    amount_won: int | None = None
+    priority_hint: int | None = None
+    event_date: str | None = None
+    is_malso_baseline: bool | None = None
+    status: str | None = None
+    evidence_doc_id: int | None = None
+    evidence_page: int | None = None
+    evidence_excerpt: str | None = None
+    rule_track: str | None = None
+    notes: str | None = None
+    confirm: bool = False
+
+
+class OccupancyCreateIn(BaseModel):
+    claim_kind: str = "housing"  # housing | commercial
+    occupant_label: str = ""
+    deposit_won: int | None = None
+    monthly_rent_won: int | None = None
+    move_in_date: str | None = None
+    fixed_date: str | None = None
+    business_reg_date: str | None = None
+    tax_invoice_ok: int | None = None
+    evidence_doc_id: int | None = None
+    evidence_page: int | None = None
+    evidence_excerpt: str = ""
+    notes: str = ""
+
+
+class OccupancyPatchIn(BaseModel):
+    claim_kind: str | None = None
+    occupant_label: str | None = None
+    deposit_won: int | None = None
+    monthly_rent_won: int | None = None
+    move_in_date: str | None = None
+    fixed_date: str | None = None
+    business_reg_date: str | None = None
+    tax_invoice_ok: int | None = None
+    status: str | None = None
+    evidence_doc_id: int | None = None
+    evidence_page: int | None = None
+    evidence_excerpt: str | None = None
+    notes: str | None = None
+    confirm: bool = False
+
+
+class TimelineEvaluateIn(BaseModel):
+    apply_finance_suggest: bool = False

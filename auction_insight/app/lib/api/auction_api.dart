@@ -251,4 +251,56 @@ class AuctionApi {
     );
     return Map<String, dynamic>.from(res.data as Map);
   }
+
+  Future<Map<String, dynamic>> createAnalysisRight(
+    int itemId,
+    Map<String, dynamic> body,
+  ) async {
+    final res = await _dio.post('/api/analysis/items/$itemId/rights', data: body);
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> patchAnalysisRight(
+    int rightId,
+    Map<String, dynamic> body,
+  ) async {
+    final res = await _dio.patch('/api/analysis/rights/$rightId', data: body);
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<void> deleteAnalysisRight(int rightId) async {
+    await _dio.delete('/api/analysis/rights/$rightId');
+  }
+
+  Future<Map<String, dynamic>> createAnalysisOccupancy(
+    int itemId,
+    Map<String, dynamic> body,
+  ) async {
+    final res =
+        await _dio.post('/api/analysis/items/$itemId/occupancies', data: body);
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> patchAnalysisOccupancy(
+    int occId,
+    Map<String, dynamic> body,
+  ) async {
+    final res = await _dio.patch('/api/analysis/occupancies/$occId', data: body);
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<void> deleteAnalysisOccupancy(int occId) async {
+    await _dio.delete('/api/analysis/occupancies/$occId');
+  }
+
+  Future<AnalysisItemDetail> evaluateAnalysisTimeline(
+    int itemId, {
+    bool applyFinanceSuggest = false,
+  }) async {
+    final res = await _dio.post(
+      '/api/analysis/items/$itemId/timeline/evaluate',
+      data: {'apply_finance_suggest': applyFinanceSuggest},
+    );
+    return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
 }

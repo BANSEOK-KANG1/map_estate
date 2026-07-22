@@ -69,6 +69,26 @@ def _sqlite_add_columns(connection) -> None:
     for stmt in dalters:
         connection.execute(text(stmt))
 
+    # analysis rights (Phase 3)
+    try:
+        rrows = connection.execute(
+            text("PRAGMA table_info(analysis_right_entries)")
+        ).fetchall()
+    except Exception:  # noqa: BLE001
+        return
+    if not rrows:
+        return
+    rcols = {r[1] for r in rrows}
+    ralters = []
+    if "event_date" not in rcols:
+        ralters.append("ALTER TABLE analysis_right_entries ADD COLUMN event_date DATE")
+    if "is_malso_baseline" not in rcols:
+        ralters.append(
+            "ALTER TABLE analysis_right_entries ADD COLUMN is_malso_baseline INTEGER DEFAULT 0"
+        )
+    for stmt in ralters:
+        connection.execute(text(stmt))
+
 
 async def init_db() -> None:
     from app import models  # noqa: F401

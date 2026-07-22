@@ -101,10 +101,12 @@ class RightEntry(Base):
         Integer, ForeignKey("analysis_auction_items.id"), nullable=False
     )
     kind: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    # mortgage | seize | lease_reg | tax | other
+    # mortgage | seize | lease_reg | tax | other | baseline
     label: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     amount_won: Mapped[int | None] = mapped_column(Integer, nullable=True)
     priority_hint: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    event_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    is_malso_baseline: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="UNKNOWN")
     # UNKNOWN | HOLD | EXTINGUISH | ASSUME | INFO
     evidence_doc_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -21,6 +21,7 @@ from app.analysis.models import (
     LoanScenario,
 )
 from app.analysis.money import detect_digit_errors, parse_user_amount, triple_dict
+from app.analysis.rights_eval import apply_evaluation
 from app.analysis.rules import get_rule, seed_rules
 from app.analysis.schemas import AuctionItemCreate, FinanceUpdate
 
@@ -265,7 +266,9 @@ async def recompute(session: AsyncSession, item_id: int) -> AuctionItem:
             "취득세를 RuleConfig·세무사 기준으로 입력하세요 (현재 0 — UNKNOWN)."
         )
     if not item.rights:
-        check_next.append("등기 갑·을구 권리를 문서 근거와 함께 입력하세요.")
+        check_next.append("등기 갑·을구 권리를 문서 근거·등기일과 함께 입력하세요.")
+    if not item.occupancies:
+        check_next.append("점유·임차(주택/상가 분리)를 입력하고 대항력을 평가하세요.")
     for w in digit_warn:
         check_next.append(w["message"])
 
@@ -440,15 +443,42 @@ def serialize_detail(item: AuctionItem) -> dict:
                 "kind": r.kind,
                 "label": r.label,
                 "amount_won": r.amount_won,
+                "priority_hint": r.priority_hint,
+                "event_date": r.event_date.isoformat() if r.event_date else None,
+                "is_malso_baseline": bool(getattr(r, "is_malso_baseline", 0)),
                 "status": r.status,
                 "evidence_doc_id": r.evidence_doc_id,
                 "evidence_page": r.evidence_page,
                 "evidence_excerpt": r.evidence_excerpt,
+                "confirmed_at": r.confirmed_at.isoformat() if r.confirmed_at else None,
                 "rule_track": r.rule_track,
                 "notes": r.notes,
             }
             for r in item.rights
         ],
+        "occupancies": [
+            {
+                "id": c.id,
+                "claim_kind": c.claim_kind,
+                "occupant_label": c.occupant_label,
+                "deposit_won": c.deposit_won,
+                "monthly_rent_won": c.monthly_rent_won,
+                "move_in_date": c.move_in_date.isoformat() if c.move_in_date else None,
+                "fixed_date": c.fixed_date.isoformat() if c.fixed_date else None,
+                "business_reg_date": c.business_reg_date.isoformat()
+                if c.business_reg_date
+                else None,
+                "tax_invoice_ok": c.tax_invoice_ok,
+                "status": c.status,
+                "evidence_doc_id": c.evidence_doc_id,
+                "evidence_page": c.evidence_page,
+                "evidence_excerpt": c.evidence_excerpt,
+                "confirmed_at": c.confirmed_at.isoformat() if c.confirmed_at else None,
+                "notes": c.notes,
+            }
+            for c in item.occupancies
+        ],
+        "timeline_eval": apply_evaluation(item, docs_ok=not bool(missing), persist=False),
         "tabs_hint": [
             "overview",
             "rights",

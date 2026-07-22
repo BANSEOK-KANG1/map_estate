@@ -98,6 +98,8 @@ class AnalysisItemDetail extends AnalysisItemSummary {
   final String rightsStatusNote;
   final List<Map<String, dynamic>> documents;
   final List<Map<String, dynamic>> rights;
+  final List<Map<String, dynamic>> occupancies;
+  final Map<String, dynamic> timelineEval;
 
   AnalysisItemDetail({
     required super.id,
@@ -127,6 +129,8 @@ class AnalysisItemDetail extends AnalysisItemSummary {
     this.rightsStatusNote = '',
     this.documents = const [],
     this.rights = const [],
+    this.occupancies = const [],
+    this.timelineEval = const {},
   });
 
   factory AnalysisItemDetail.fromJson(Map<String, dynamic> json) {
@@ -168,6 +172,10 @@ class AnalysisItemDetail extends AnalysisItemSummary {
       rights: (json['rights'] as List? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList(),
+      occupancies: (json['occupancies'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
+      timelineEval: Map<String, dynamic>.from(json['timeline_eval'] as Map? ?? {}),
     );
   }
 }

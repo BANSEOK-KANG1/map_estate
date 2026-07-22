@@ -216,8 +216,12 @@ async def attach_evidence_as_right(
     kind: str = "other",
     query: str = "",
     amount_won: int | None = None,
+    event_date: str | None = None,
+    is_malso_baseline: bool = False,
 ) -> RightEntry:
     """Create a RightEntry in HOLD/UNKNOWN with mandatory evidence fields."""
+    from datetime import date as date_cls
+
     item = await get_item(session, item_id)
     if item is None:
         raise LookupError("item not found")
@@ -228,18 +232,29 @@ async def attach_evidence_as_right(
     if doc is None or not (doc.extracted_text or "").strip():
         status = "UNKNOWN"
     rule_track = "court_malso" if item.source == "court" else "onbid_tax_distribute"
+    parsed_date = None
+    if event_date:
+        try:
+            parsed_date = date_cls.fromisoformat(str(event_date)[:10])
+        except ValueError:
+            parsed_date = None
+    if is_malso_baseline and item.source == "court":
+        for r in item.rights:
+            r.is_malso_baseline = 0
     entry = RightEntry(
         item_id=item_id,
         kind=kind or "other",
         label=label or f"{ev['doc_type']} p.{page}",
         amount_won=amount_won,
+        event_date=parsed_date,
+        is_malso_baseline=1 if is_malso_baseline else 0,
         status=status,
         evidence_doc_id=doc_id,
         evidence_page=page,
         evidence_excerpt=ev["excerpt"][:2000],
         confirmed_at=None,
         rule_track=rule_track,
-        notes="문서 근거 연결됨. 선후순위·말소/인수는 결정론적 규칙 Phase 3에서 확정.",
+        notes="문서 근거 연결됨. 타임라인 평가로 말소/인수 후보를 산출하세요.",
     )
     session.add(entry)
     await session.commit()

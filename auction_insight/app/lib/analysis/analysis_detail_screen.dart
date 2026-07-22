@@ -49,7 +49,7 @@ class AnalysisDetailScreen extends ConsumerWidget {
           body: TabBarView(
             children: [
               _OverviewTab(item: item),
-              _RightsTab(item: item),
+              _RightsTab(item: item, itemId: itemId),
               _LoanTab(item: item, itemId: itemId),
               _MarketTab(item: item),
               _DocsTab(item: item, itemId: itemId),
@@ -155,43 +155,348 @@ Widget _moneyCard(String label, MoneyTriple? m) {
   );
 }
 
-class _RightsTab extends StatelessWidget {
-  const _RightsTab({required this.item});
+class _RightsTab extends ConsumerStatefulWidget {
+  const _RightsTab({required this.item, required this.itemId});
   final AnalysisItemDetail item;
+  final int itemId;
+
+  @override
+  ConsumerState<_RightsTab> createState() => _RightsTabState();
+}
+
+class _RightsTabState extends ConsumerState<_RightsTab> {
+  bool _busy = false;
+  String? _msg;
+  final _rightLabel = TextEditingController();
+  final _rightAmount = TextEditingController();
+  final _rightDate = TextEditingController();
+  String _rightKind = 'mortgage';
+  bool _asBaseline = false;
+
+  final _occLabel = TextEditingController();
+  final _occDeposit = TextEditingController();
+  final _moveIn = TextEditingController();
+  final _fixed = TextEditingController();
+  final _bizReg = TextEditingController();
+  String _occKind = 'housing';
+  bool _taxOk = true;
+
+  @override
+  void dispose() {
+    _rightLabel.dispose();
+    _rightAmount.dispose();
+    _rightDate.dispose();
+    _occLabel.dispose();
+    _occDeposit.dispose();
+    _moveIn.dispose();
+    _fixed.dispose();
+    _bizReg.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addRight() async {
+    setState(() => _busy = true);
+    try {
+      final docs = widget.item.documents;
+      await ref.read(apiProvider).createAnalysisRight(widget.itemId, {
+        'kind': _rightKind,
+        'label': _rightLabel.text.trim().isEmpty
+            ? _rightKind
+            : _rightLabel.text.trim(),
+        if (_rightAmount.text.trim().isNotEmpty)
+          'amount_won': int.tryParse(_rightAmount.text.replaceAll(',', '')),
+        if (_rightDate.text.trim().isNotEmpty) 'event_date': _rightDate.text.trim(),
+        'is_malso_baseline': _asBaseline,
+        if (docs.isNotEmpty) 'evidence_doc_id': docs.first['id'],
+        'evidence_excerpt': docs.isEmpty
+            ? ''
+            : (docs.first['text_preview'] as String? ?? '수동 입력'),
+        'evidence_page': 1,
+      });
+      ref.invalidate(_analysisProvider(widget.itemId));
+      setState(() => _msg = '권리 항목 추가됨');
+    } catch (e) {
+      setState(() => _msg = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _addOcc() async {
+    setState(() => _busy = true);
+    try {
+      final docs = widget.item.documents;
+      await ref.read(apiProvider).createAnalysisOccupancy(widget.itemId, {
+        'claim_kind': _occKind,
+        'occupant_label': _occLabel.text.trim(),
+        if (_occDeposit.text.trim().isNotEmpty)
+          'deposit_won': int.tryParse(_occDeposit.text.replaceAll(',', '')),
+        if (_occKind == 'housing') ...{
+          if (_moveIn.text.trim().isNotEmpty) 'move_in_date': _moveIn.text.trim(),
+          if (_fixed.text.trim().isNotEmpty) 'fixed_date': _fixed.text.trim(),
+        } else ...{
+          if (_bizReg.text.trim().isNotEmpty)
+            'business_reg_date': _bizReg.text.trim(),
+          'tax_invoice_ok': _taxOk ? 1 : 0,
+        },
+        if (docs.isNotEmpty) 'evidence_doc_id': docs.first['id'],
+        'evidence_excerpt': docs.isEmpty ? '' : '점유·임차 수동 입력',
+        'evidence_page': 1,
+      });
+      ref.invalidate(_analysisProvider(widget.itemId));
+      setState(() => _msg = '점유/임차 추가됨');
+    } catch (e) {
+      setState(() => _msg = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _evaluate({bool applyFinance = false}) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(apiProvider).evaluateAnalysisTimeline(
+            widget.itemId,
+            applyFinanceSuggest: applyFinance,
+          );
+      ref.invalidate(_analysisProvider(widget.itemId));
+      setState(() => _msg = applyFinance ? '평가 + 인수금액 제안 반영' : '타임라인 평가 완료');
+    } catch (e) {
+      setState(() => _msg = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final eval = item.timelineEval;
+    final timeline = (eval['timeline'] as List?) ?? const [];
+    final flags = ((eval['risk_flags'] as List?) ?? const []).cast<String>();
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text(item.rightsStatusNote),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Text(
           item.source == 'court'
-              ? '법원경매: 말소기준권리 로직은 문서 근거가 있을 때만 진행합니다. 없으면 UNKNOWN/HOLD.'
-              : '온비드공매: 조세 법정기일·배분 로직은 법원 말소기준과 분리됩니다. 문서 없으면 확정 금지.',
+              ? '트랙: 법원경매 말소기준권리 (court_malso). 등기일 선후순위로 말소/인수 후보만 제시합니다.'
+              : '트랙: 온비드 조세·배분 (onbid_tax_distribute). 법원 말소 자동소멸 로직을 쓰지 않습니다.',
+          style: TextStyle(color: AppTheme.ink.withValues(alpha: 0.7), fontSize: 12),
         ),
-        const SizedBox(height: 12),
-        if (item.missingDocs.isNotEmpty)
-          ...item.missingDocs.map((d) => Text('· 필수문서 결여: $d')),
+        if (eval['malso_date'] != null) ...[
+          const SizedBox(height: 6),
+          Text('말소기준일 후보: ${eval['malso_date']}'),
+        ],
+        if (flags.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            children: flags.map((f) => Chip(label: Text(f), visualDensity: VisualDensity.compact)).toList(),
+          ),
+        ],
         const SizedBox(height: 8),
-        const Text(
-          '주택/상가 임차 대항력 입력은 OccupancyClaim으로 분리되어 있습니다. 문서함에서 페이지 근거를 연결하세요.',
+        Text(
+          eval['disclaimer'] as String? ??
+              '법률 자문이 아닙니다. 자동평가는 입찰을 결정하지 않습니다.',
+          style: const TextStyle(fontSize: 12),
         ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          children: [
+            FilledButton(
+              onPressed: _busy ? null : () => _evaluate(),
+              child: Text(_busy ? '평가 중…' : '타임라인 평가'),
+            ),
+            OutlinedButton(
+              onPressed: _busy ? null : () => _evaluate(applyFinance: true),
+              child: const Text('평가+인수금액 반영'),
+            ),
+          ],
+        ),
+        if (_msg != null) ...[
+          const SizedBox(height: 6),
+          Text(_msg!),
+        ],
         const Divider(),
-        if (item.rights.isEmpty)
-          const Text('연결된 권리 항목 없음 — 문서함에서 「이 페이지→권리 연결」')
+        const Text('타임라인', style: TextStyle(fontWeight: FontWeight.w700)),
+        if (timeline.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('권리·점유를 추가한 뒤 평가하세요.'),
+          )
         else
+          ...timeline.map((e) {
+            final m = Map<String, dynamic>.from(e as Map);
+            return ListTile(
+              dense: true,
+              leading: Text(m['date'] as String? ?? '—'),
+              title: Text('${m['status']} · ${m['label']}'),
+              subtitle: Text('${m['kind']} · ${m['track']}\n${m['note'] ?? ''}'),
+              isThreeLine: true,
+            );
+          }),
+        const Divider(),
+        const Text('권리 추가', style: TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          children: [
+            for (final k in const [
+              'mortgage',
+              'seize',
+              'lease_reg',
+              'tax',
+              'other',
+            ])
+              ChoiceChip(
+                label: Text(k),
+                selected: _rightKind == k,
+                onSelected: (_) => setState(() => _rightKind = k),
+              ),
+          ],
+        ),
+        TextField(
+          controller: _rightLabel,
+          decoration: const InputDecoration(labelText: '라벨'),
+        ),
+        TextField(
+          controller: _rightAmount,
+          decoration: const InputDecoration(labelText: '금액(원)'),
+          keyboardType: TextInputType.number,
+        ),
+        TextField(
+          controller: _rightDate,
+          decoration: const InputDecoration(labelText: '등기·법정일 YYYY-MM-DD'),
+        ),
+        if (item.source == 'court')
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('말소기준권리로 지정'),
+            value: _asBaseline,
+            onChanged: (v) => setState(() => _asBaseline = v),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonal(
+            onPressed: _busy ? null : _addRight,
+            child: const Text('권리 저장'),
+          ),
+        ),
+        if (item.rights.isNotEmpty) ...[
+          const SizedBox(height: 8),
           ...item.rights.map(
             (r) => ListTile(
-              title: Text('${r['status']} · ${r['label']}'),
+              dense: true,
+              title: Text(
+                '${r['status']} · ${r['label']}'
+                '${r['is_malso_baseline'] == true ? ' ★말소기준' : ''}',
+              ),
               subtitle: Text(
-                '${r['rule_track']} · doc ${r['evidence_doc_id']} p.${r['evidence_page']}\n'
-                '${r['evidence_excerpt'] ?? ''}',
+                '${r['kind']} · ${r['event_date'] ?? '일자없음'} · '
+                '${r['rule_track']}\n${r['notes'] ?? ''}',
               ),
               isThreeLine: true,
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline),
+                onPressed: _busy
+                    ? null
+                    : () async {
+                        await ref
+                            .read(apiProvider)
+                            .deleteAnalysisRight(r['id'] as int);
+                        ref.invalidate(_analysisProvider(widget.itemId));
+                      },
+              ),
             ),
           ),
+        ],
+        const Divider(),
+        const Text('점유·임차 (주택/상가 분리)', style: TextStyle(fontWeight: FontWeight.w700)),
+        Row(
+          children: [
+            ChoiceChip(
+              label: const Text('주택'),
+              selected: _occKind == 'housing',
+              onSelected: (_) => setState(() => _occKind = 'housing'),
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('상가'),
+              selected: _occKind == 'commercial',
+              onSelected: (_) => setState(() => _occKind = 'commercial'),
+            ),
+          ],
+        ),
+        TextField(
+          controller: _occLabel,
+          decoration: const InputDecoration(labelText: '점유자 라벨'),
+        ),
+        TextField(
+          controller: _occDeposit,
+          decoration: const InputDecoration(labelText: '보증금(원)'),
+          keyboardType: TextInputType.number,
+        ),
+        if (_occKind == 'housing') ...[
+          TextField(
+            controller: _moveIn,
+            decoration: const InputDecoration(labelText: '전입일 YYYY-MM-DD'),
+          ),
+          TextField(
+            controller: _fixed,
+            decoration: const InputDecoration(labelText: '확정일자 YYYY-MM-DD'),
+          ),
+        ] else ...[
+          TextField(
+            controller: _bizReg,
+            decoration: const InputDecoration(labelText: '사업자등록일 YYYY-MM-DD'),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('세금계산서 등 요건 OK'),
+            value: _taxOk,
+            onChanged: (v) => setState(() => _taxOk = v),
+          ),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonal(
+            onPressed: _busy ? null : _addOcc,
+            child: const Text('점유/임차 저장'),
+          ),
+        ),
+        if (item.occupancies.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ...item.occupancies.map(
+            (c) => ListTile(
+              dense: true,
+              title: Text('${c['status']} · ${c['claim_kind']} · ${c['occupant_label']}'),
+              subtitle: Text(
+                '보증금 ${c['deposit_won'] ?? '-'} · '
+                '${c['move_in_date'] ?? c['business_reg_date'] ?? ''}\n'
+                '${c['notes'] ?? ''}',
+              ),
+              isThreeLine: true,
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline),
+                onPressed: _busy
+                    ? null
+                    : () async {
+                        await ref
+                            .read(apiProvider)
+                            .deleteAnalysisOccupancy(c['id'] as int);
+                        ref.invalidate(_analysisProvider(widget.itemId));
+                      },
+              ),
+            ),
+          ),
+        ],
+        if (item.missingDocs.isNotEmpty) ...[
+          const Divider(),
+          ...item.missingDocs.map((d) => Text('· 필수문서 결여: $d')),
+        ],
       ],
     );
   }
@@ -639,7 +944,7 @@ class _SiteTab extends StatelessWidget {
         Text('· 누수·불법건축·주차'),
         Text('· 관리비 체납 확인'),
         Text('· 주변 시세 체감'),
-        Text('Phase 3+에서 체크리스트 저장을 붙입니다.'),
+        Text('현장조사 메모는 다음 단계에서 저장합니다. 권리·점유는 「권리」탭에서 평가하세요.'),
       ],
     );
   }

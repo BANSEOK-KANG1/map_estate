@@ -36,7 +36,8 @@
 - `app/analysis/storage.py` — DocumentStore 추상화 (local → S3 교체)
 - `app/analysis/service.py` · `schemas.py` · `router.py`
 - `app/analysis/pdf_extract.py` · `documents.py` · `pii.py` · `storage.py`
-- `tests/test_money_calculator.py` · `tests/test_analysis_models.py` · `tests/test_pdf_classify.py`
+- `app/analysis/rights_eval.py` · `rights_service.py`
+- `tests/test_money_calculator.py` · `tests/test_analysis_models.py` · `tests/test_pdf_classify.py` · `tests/test_rights_eval.py`
 
 ### Backend (수정)
 - `app/main.py` — analysis router include
@@ -92,10 +93,24 @@ POST /api/analysis/documents/{doc_id}/evidence   # 페이지 발췌
 POST /api/analysis/items/{id}/rights/from-evidence  # 근거→RightEntry (HOLD/UNKNOWN)
 ```
 
-저장: `DocumentStore` (기본 local `ANALYSIS_DOC_ROOT`, 이후 `ANALYSIS_DOC_STORE=s3`).  
-LLM 요약은 Phase 후반 — 날짜·금액·유형 분류는 결정론 코드.
+### Phase 3 (권리·점유 타임라인)
+```
+POST   /api/analysis/items/{id}/rights
+PATCH  /api/analysis/rights/{id}
+DELETE /api/analysis/rights/{id}
+POST   /api/analysis/items/{id}/occupancies
+PATCH  /api/analysis/occupancies/{id}
+DELETE /api/analysis/occupancies/{id}
+POST   /api/analysis/items/{id}/timeline/evaluate   # court_malso vs onbid_tax_distribute
+```
 
-Phase 3+: 권리 CRUD 확정 로직, occupancy, LLM summarize (설명 only).
+- 법원: 말소기준일 대비 등기일 → EXTINGUISH(후) / ASSUME(선) 후보. 문서·근거 없으면 HOLD.
+- 온비드: 조세·배분 트랙 — 법원 말소 자동소멸 미적용.
+- 주택: 전입+확정일자 vs 말소기준. 상가: 사업자등록+세금계산서 요건 분리.
+- 자동평가는 입찰을 결정하지 않음 (disclaimer).
+
+저장: `DocumentStore` (기본 local `ANALYSIS_DOC_ROOT`, 이후 `ANALYSIS_DOC_STORE=s3`).  
+LLM 요약은 Phase 후반 — 날짜·금액·유형 분류·선후순위는 결정론 코드.
 
 ---
 
@@ -116,7 +131,7 @@ Phase 3+: 권리 CRUD 확정 로직, occupancy, LLM summarize (설명 only).
 | 0 | 감사·설계 (본 문서) |
 | **1** | 수동 등록, 지도·목록·상세 탭 골격, 금액 안전장치, 계산기, 모드 전환 |
 | **2** | PDF·근거 추적·마스킹·DocumentStore (local→S3 stub) |
-| 3 | 권리·점유 타임라인 (court vs onbid 로직 분리) |
+| **3** | 권리·점유 타임라인 (court vs onbid 로직 분리) |
 | 4 | 대출 시나리오 (RuleConfig) |
 | 5 | 공식 데이터 연동 (기존 AuctionLot 링크) |
 | 6 | 테스트·보안·배포 |

@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis import documents as doc_service
+from app.analysis import rights_service
 from app.analysis import service
 from app.analysis.models import RuleConfig
 from app.analysis.money import detect_digit_errors, parse_user_amount, triple_dict
@@ -14,8 +15,13 @@ from app.analysis.schemas import (
     FinanceUpdate,
     MoneyValidateIn,
     MoneyValidateOut,
+    OccupancyCreateIn,
+    OccupancyPatchIn,
+    RightCreateIn,
     RightFromEvidenceIn,
+    RightPatchIn,
     RuleOut,
+    TimelineEvaluateIn,
 )
 from app.db import get_db
 
@@ -225,16 +231,107 @@ async def right_from_evidence(
             kind=body.kind,
             query=body.query,
             amount_won=body.amount_won,
+            event_date=body.event_date,
+            is_malso_baseline=body.is_malso_baseline,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    return {
-        "id": entry.id,
-        "status": entry.status,
-        "label": entry.label,
-        "evidence_doc_id": entry.evidence_doc_id,
-        "evidence_page": entry.evidence_page,
-        "evidence_excerpt": entry.evidence_excerpt,
-        "rule_track": entry.rule_track,
-        "notes": entry.notes,
-    }
+    return rights_service.serialize_right(entry)
+
+
+@router.post("/items/{item_id}/rights")
+async def create_right(
+    item_id: int,
+    body: RightCreateIn,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        entry = await rights_service.create_right(db, item_id, body.model_dump())
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return rights_service.serialize_right(entry)
+
+
+@router.patch("/rights/{right_id}")
+async def patch_right(
+    right_id: int,
+    body: RightPatchIn,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        entry = await rights_service.patch_right(
+            db, right_id, body.model_dump(exclude_unset=True)
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return rights_service.serialize_right(entry)
+
+
+@router.delete("/rights/{right_id}")
+async def delete_right(right_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        await rights_service.delete_right(db, right_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return {"ok": True}
+
+
+@router.post("/items/{item_id}/occupancies")
+async def create_occupancy(
+    item_id: int,
+    body: OccupancyCreateIn,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        claim = await rights_service.create_occupancy(db, item_id, body.model_dump())
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return rights_service.serialize_occupancy(claim)
+
+
+@router.patch("/occupancies/{occ_id}")
+async def patch_occupancy(
+    occ_id: int,
+    body: OccupancyPatchIn,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        claim = await rights_service.patch_occupancy(
+            db, occ_id, body.model_dump(exclude_unset=True)
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return rights_service.serialize_occupancy(claim)
+
+
+@router.delete("/occupancies/{occ_id}")
+async def delete_occupancy(occ_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        await rights_service.delete_occupancy(db, occ_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return {"ok": True}
+
+
+@router.post("/items/{item_id}/timeline/evaluate")
+async def evaluate_timeline(
+    item_id: int,
+    body: TimelineEvaluateIn = TimelineEvaluateIn(),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await rights_service.evaluate_item(
+            db,
+            item_id,
+            apply_finance_suggest=body.apply_finance_suggest,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
