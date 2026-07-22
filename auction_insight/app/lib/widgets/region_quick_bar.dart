@@ -88,11 +88,11 @@ class RegionQuickBar extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
           child: Text(
-            '지역 빠른 선택',
+            '지역 빠른 선택  ·  전체 / 서울 / 경기 / 인천',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Colors.black.withValues(alpha: 0.45),
+              color: const Color(0xFFC47B2B),
               letterSpacing: 0.2,
             ),
           ),

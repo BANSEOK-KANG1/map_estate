@@ -19,6 +19,17 @@ _WEB_CANDIDATES = [
 ]
 WEB_DIR = next((p for p in _WEB_CANDIDATES if p.exists()), _WEB_CANDIDATES[0])
 
+_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+def _file_response(path: Path, *, no_cache: bool = False) -> FileResponse:
+    headers = dict(_NO_CACHE_HEADERS) if no_cache else None
+    return FileResponse(path, headers=headers)
+
 
 class PrivateNetworkCorsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -152,16 +163,22 @@ def create_app() -> FastAPI:
 
         @app.get("/")
         async def spa_index():
-            return FileResponse(WEB_DIR / "index.html")
+            return _file_response(WEB_DIR / "index.html", no_cache=True)
 
         @app.get("/{full_path:path}")
         async def spa_fallback(full_path: str):
             candidate = WEB_DIR / full_path
             if candidate.is_file():
-                return FileResponse(candidate)
+                no_cache = candidate.suffix in {".html", ".js", ".json"} or candidate.name in {
+                    "flutter_bootstrap.js",
+                    "main.dart.js",
+                    "flutter.js",
+                    "version.json",
+                }
+                return _file_response(candidate, no_cache=no_cache)
             index = WEB_DIR / "index.html"
             if index.exists() and not full_path.startswith("api"):
-                return FileResponse(index)
+                return _file_response(index, no_cache=True)
             return Response(status_code=404)
 
     return app

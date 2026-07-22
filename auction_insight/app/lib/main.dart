@@ -38,7 +38,7 @@ class AuctionInsightApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Auction Insight',
+      title: '경공매 인사이트',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routerConfig: _router,

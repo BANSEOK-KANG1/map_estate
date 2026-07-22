@@ -57,7 +57,7 @@ class HomeScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Auction Insight',
+                            '경공매 인사이트',
                             style: TextStyle(
                               fontSize: isDesktop ? 24 : 22,
                               fontWeight: FontWeight.w800,
@@ -67,7 +67,7 @@ class HomeScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '경·공매 · 상권 · 시가 비교',
+                            '서울·경기·인천 공매를 지도에서 탐색',
                             style: TextStyle(
                               fontSize: 13,
                               color: AppTheme.ink.withValues(alpha: 0.55),
