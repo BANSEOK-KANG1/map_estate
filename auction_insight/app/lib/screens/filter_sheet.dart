@@ -4,16 +4,28 @@ import 'package:auction_insight_app/models/models.dart';
 import 'package:auction_insight_app/providers/providers.dart';
 import 'package:auction_insight_app/theme.dart';
 
-const kUsageOptions = <String>[
-  '아파트',
-  '오피스텔',
-  '다가구',
-  '다세대',
-  '근린생활시설',
-  '업무시설',
-  '단독주택',
-  '토지',
+/// Display label → API usage substring (ilike).
+const kUsageOptions = <(String label, String query)>[
+  ('아파트', '아파트'),
+  ('오피스텔', '오피스텔'),
+  ('다가구', '다가구'),
+  ('다세대', '다세대'),
+  ('도시형', '도시형생활주택'),
+  ('근생', '근린생활'),
+  ('업무', '업무시설'),
+  ('단독', '단독주택'),
+  ('기타주거', '기타주거'),
+  ('토지', '토지'),
+  ('임야', '임야'),
+  ('공장', '공장'),
 ];
+
+String usageChipLabel(String query) {
+  for (final (label, q) in kUsageOptions) {
+    if (q == query) return label;
+  }
+  return query;
+}
 
 const kSidoOptions = <String>['서울특별시', '경기도', '인천광역시'];
 
@@ -112,25 +124,50 @@ Future<void> showFilterSheet(BuildContext context, WidgetRef ref) async {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      for (final u in kUsageOptions)
-                        FilterChip(
-                          label: Text(u),
-                          selected: usages.contains(u),
-                          onSelected: (v) {
-                            setState(() {
-                              if (v) {
-                                usages = [...usages, u];
-                              } else {
-                                usages = usages.where((e) => e != u).toList();
-                              }
-                            });
-                          },
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: kUsageOptions.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 2.6,
+                    ),
+                    itemBuilder: (_, i) {
+                      final (label, query) = kUsageOptions[i];
+                      final selected = usages.contains(query);
+                      return FilterChip(
+                        label: SizedBox(
+                          width: double.infinity,
+                          child: Text(
+                            label,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                    ],
+                        selected: selected,
+                        showCheckmark: false,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        labelPadding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                        ),
+                        onSelected: (v) {
+                          setState(() {
+                            if (v) {
+                              usages = [...usages, query];
+                            } else {
+                              usages =
+                                  usages.where((e) => e != query).toList();
+                            }
+                          });
+                        },
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   const Text('유찰', style: TextStyle(fontWeight: FontWeight.w600)),

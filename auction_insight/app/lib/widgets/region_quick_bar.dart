@@ -150,7 +150,17 @@ class RegionQuickBar extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: FilterChip(
-                      label: Text(r.name),
+                      label: Text(
+                        r.name
+                            .replaceFirst(RegExp(r'^수원시\s*'), '수원 ')
+                            .replaceFirst(RegExp(r'^성남시\s*'), '성남 ')
+                            .replaceFirst(RegExp(r'^안양시\s*'), '안양 ')
+                            .replaceFirst(RegExp(r'^부천시\s*'), '부천 ')
+                            .replaceFirst(RegExp(r'^안산시\s*'), '안산 ')
+                            .replaceFirst(RegExp(r'^고양시\s*'), '고양 ')
+                            .replaceFirst(RegExp(r'^용인시\s*'), '용인 ')
+                            .replaceFirst(RegExp(r'^화성시\s*'), '화성 '),
+                      ),
                       selected: !wholeSidoSelected &&
                           filters.regionCodes.contains(r.code),
                       visualDensity: VisualDensity.compact,

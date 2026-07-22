@@ -104,7 +104,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     for (final u in filters.usages)
                       Chip(
-                        label: Text(u),
+                        label: Text(usageChipLabel(u)),
                         visualDensity: VisualDensity.compact,
                       ),
                     if (filters.minFailCount != null)

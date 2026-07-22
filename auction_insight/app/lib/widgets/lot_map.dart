@@ -201,7 +201,7 @@ class _LotMapState extends State<LotMap> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
-                      '지도 좌표가 아직 없습니다\n설정 → 지도 좌표 붙이기를 실행해 주세요',
+                      '지도 핀이 아직 없어요\n목록은 아래 · 잠시 후 새로고침해 주세요',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.95),

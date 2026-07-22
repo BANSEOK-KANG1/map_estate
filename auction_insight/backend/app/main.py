@@ -57,7 +57,8 @@ class PrivateNetworkCorsMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await init_db()
-    # Free Render has ephemeral disk — refill when waking to an empty DB.
+    # Free Render has ephemeral disk — refill when waking to an empty DB,
+    # and rebalance map coords so 경기/인천 aren't left blank after partial geocode.
     try:
         import asyncio
 
@@ -70,9 +71,99 @@ async def lifespan(_app: FastAPI):
             total = (await session.execute(select(func.count(AuctionLot.id)))).scalar_one()
         if total == 0:
             asyncio.create_task(_bootstrap_if_empty())
+        else:
+            asyncio.create_task(_rebalance_geocode_if_needed())
     except Exception:  # noqa: BLE001
         pass
     yield
+
+
+async def _pick_balanced_ungeocoded(session, per: int = 80) -> list:
+    from sqlalchemy import select
+
+    from app.data.regions import GYEONGGI_REGIONS, INCHEON_REGIONS, SEOUL_REGIONS
+    from app.models import AuctionLot
+
+    groups = [SEOUL_REGIONS, GYEONGGI_REGIONS, INCHEON_REGIONS]
+    targets: list = []
+    seen: set[int] = set()
+    for group in groups:
+        codes = [r["code"] for r in group]
+        batch = (
+            await session.execute(
+                select(AuctionLot)
+                .where(
+                    AuctionLot.lat.is_(None),
+                    AuctionLot.region_code.in_(codes),
+                )
+                .order_by(
+                    AuctionLot.bid_end_at.asc().nullslast(),
+                    AuctionLot.id.asc(),
+                )
+                .limit(per)
+            )
+        ).scalars().all()
+        for lot in batch:
+            if lot.id not in seen:
+                targets.append(lot)
+                seen.add(lot.id)
+    return targets
+
+
+async def _rebalance_geocode_if_needed() -> None:
+    """If any MVP sido has lots but almost no map pins, geocode a balanced batch."""
+    import logging
+
+    from sqlalchemy import func, select
+
+    from app.data.regions import GYEONGGI_REGIONS, INCHEON_REGIONS, SEOUL_REGIONS
+    from app.db import SessionLocal
+    from app.models import AuctionLot
+    from app.services.enrich import enrich_lots
+
+    logger = logging.getLogger(__name__)
+    settings = get_settings()
+    if not settings.kakao_rest_key:
+        return
+    try:
+        async with SessionLocal() as session:
+            needs = False
+            for group in (SEOUL_REGIONS, GYEONGGI_REGIONS, INCHEON_REGIONS):
+                codes = [r["code"] for r in group]
+                total = (
+                    await session.execute(
+                        select(func.count(AuctionLot.id)).where(
+                            AuctionLot.region_code.in_(codes)
+                        )
+                    )
+                ).scalar_one()
+                with_coords = (
+                    await session.execute(
+                        select(func.count(AuctionLot.id)).where(
+                            AuctionLot.region_code.in_(codes),
+                            AuctionLot.lat.isnot(None),
+                        )
+                    )
+                ).scalar_one()
+                if total >= 20 and with_coords < 10:
+                    needs = True
+                    break
+            if not needs:
+                return
+            targets = await _pick_balanced_ungeocoded(session, per=70)
+            if not targets:
+                return
+            n = await enrich_lots(
+                session,
+                settings,
+                targets,
+                fetch_market=False,
+                fetch_pois=False,
+                fetch_detail=False,
+            )
+            logger.info("rebalance geocode: %s lots", n)
+    except Exception:  # noqa: BLE001
+        logger.exception("rebalance geocode failed")
 
 
 async def _bootstrap_if_empty() -> None:
@@ -101,33 +192,7 @@ async def _bootstrap_if_empty() -> None:
             run = await ingest_onbid(session, settings, max_pages=10, page_size=100)
             logger.info("bootstrap ingest: %s lots (%s)", run.lot_count, run.message[:120])
             if settings.kakao_rest_key and run.lot_count > 0:
-                from app.data.regions import GYEONGGI_REGIONS, INCHEON_REGIONS, SEOUL_REGIONS
-
-                # Spread geocode across 서울/경기/인천 so map isn't Incheon-only
-                groups = [SEOUL_REGIONS, GYEONGGI_REGIONS, INCHEON_REGIONS]
-                per = 80
-                targets: list = []
-                seen: set[int] = set()
-                for group in groups:
-                    codes = [r["code"] for r in group]
-                    batch = (
-                        await session.execute(
-                            select(AuctionLot)
-                            .where(
-                                AuctionLot.lat.is_(None),
-                                AuctionLot.region_code.in_(codes),
-                            )
-                            .order_by(
-                                AuctionLot.bid_end_at.asc().nullslast(),
-                                AuctionLot.id.asc(),
-                            )
-                            .limit(per)
-                        )
-                    ).scalars().all()
-                    for lot in batch:
-                        if lot.id not in seen:
-                            targets.append(lot)
-                            seen.add(lot.id)
+                targets = await _pick_balanced_ungeocoded(session, per=80)
                 if targets:
                     n = await enrich_lots(
                         session,
