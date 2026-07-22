@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:map_estate_app/models/models.dart';
 import 'package:map_estate_app/providers/providers.dart';
 import 'package:map_estate_app/screens/filter_sheet.dart';
@@ -74,6 +75,43 @@ class HomeScreen extends ConsumerWidget {
                       icon: const Icon(Icons.settings_outlined),
                     ),
                   ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('실거래'),
+                        selected: true,
+                        onSelected: (_) {},
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('법원경매'),
+                        selected: false,
+                        onSelected: (_) async {
+                          await launchUrl(
+                            Uri.parse('https://map.measuremkt.com'),
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('온비드공매'),
+                        selected: false,
+                        onSelected: (_) async {
+                          await launchUrl(
+                            Uri.parse('https://map.measuremkt.com'),
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               SizedBox(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:auction_insight_app/models/models.dart';
 import 'package:auction_insight_app/providers/providers.dart';
 import 'package:auction_insight_app/screens/filter_sheet.dart';
@@ -31,7 +32,16 @@ class HomeScreen extends ConsumerWidget {
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = width >= _desktopBreakpoint;
 
+    final homeMode = ref.watch(homeModeProvider);
+
     return Scaffold(
+      floatingActionButton: homeMode == 'real'
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => context.push('/analysis/new?source=$homeMode'),
+              icon: const Icon(Icons.science_outlined),
+              label: const Text('분석 등록'),
+            ),
       body: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -92,6 +102,48 @@ class HomeScreen extends ConsumerWidget {
                       icon: const Icon(Icons.settings_outlined),
                     ),
                   ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final (key, label) in const [
+                        ('real', '실거래'),
+                        ('court', '법원경매'),
+                        ('onbid', '온비드공매'),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(label),
+                            selected: homeMode == key,
+                            onSelected: (_) async {
+                              if (key == 'real') {
+                                final uri = Uri.parse(
+                                  'https://map-estate-uz70.onrender.com',
+                                );
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                                return;
+                              }
+                              ref.read(homeModeProvider.notifier).state = key;
+                              final cur = ref.read(filtersProvider);
+                              ref.read(filtersProvider.notifier).state =
+                                  cur.copyWith(
+                                sources: key == 'court'
+                                    ? ['court']
+                                    : ['onbid'],
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const RegionQuickBar(),

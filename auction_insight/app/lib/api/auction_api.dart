@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:auction_insight_app/analysis/analysis_models.dart';
 import 'package:auction_insight_app/config.dart';
 import 'package:auction_insight_app/models/models.dart';
 
@@ -151,5 +152,34 @@ class AuctionApi {
       },
     );
     return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<List<AnalysisItemSummary>> listAnalysisItems({String? source}) async {
+    final res = await _dio.get(
+      '/api/analysis/items',
+      queryParameters: {if (source != null) 'source': source},
+    );
+    final list = res.data as List;
+    return list
+        .map((e) => AnalysisItemSummary.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<AnalysisItemDetail> fetchAnalysisItem(int id) async {
+    final res = await _dio.get('/api/analysis/items/$id');
+    return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
+  Future<AnalysisItemDetail> createAnalysisItem(Map<String, dynamic> body) async {
+    final res = await _dio.post('/api/analysis/items', data: body);
+    return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
+  Future<AnalysisItemDetail> patchAnalysisFinance(
+    int id,
+    Map<String, dynamic> body,
+  ) async {
+    final res = await _dio.patch('/api/analysis/items/$id/finance', data: body);
+    return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
   }
 }

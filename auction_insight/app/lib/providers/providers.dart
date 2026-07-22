@@ -12,6 +12,9 @@ final filtersProvider = StateProvider<SearchFilters>(
   (ref) => const SearchFilters(),
 );
 
+/// Home product mode: real-tx link | court screening | onbid screening.
+final homeModeProvider = StateProvider<String>((ref) => 'onbid');
+
 final healthProvider = FutureProvider.autoDispose<HealthInfo>((ref) async {
   return ref.watch(apiProvider).health();
 });

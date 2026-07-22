@@ -5,6 +5,8 @@ import 'package:auction_insight_app/screens/beginner_guide_screen.dart';
 import 'package:auction_insight_app/screens/home_screen.dart';
 import 'package:auction_insight_app/screens/lot_detail_screen.dart';
 import 'package:auction_insight_app/screens/settings_screen.dart';
+import 'package:auction_insight_app/analysis/analysis_create_screen.dart';
+import 'package:auction_insight_app/analysis/analysis_detail_screen.dart';
 import 'package:auction_insight_app/theme.dart';
 
 void main() {
@@ -33,6 +35,19 @@ final _router = GoRouter(
     GoRoute(
       path: '/guide',
       builder: (context, state) => const BeginnerGuideScreen(),
+    ),
+    GoRoute(
+      path: '/analysis/new',
+      builder: (context, state) => AnalysisCreateScreen(
+        initialSource: state.uri.queryParameters['source'] ?? 'onbid',
+      ),
+    ),
+    GoRoute(
+      path: '/analysis/:id',
+      builder: (context, state) {
+        final id = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        return AnalysisDetailScreen(itemId: id);
+      },
     ),
   ],
 );

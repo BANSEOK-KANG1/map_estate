@@ -220,6 +220,9 @@ def create_app() -> FastAPI:
     )
     app.include_router(api.router, prefix="/api")
     app.include_router(demo.router, prefix="/api")
+    from app.analysis.router import router as analysis_router
+
+    app.include_router(analysis_router, prefix="/api")
 
     if WEB_DIR.exists():
         assets = WEB_DIR / "assets"

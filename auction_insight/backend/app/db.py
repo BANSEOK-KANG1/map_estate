@@ -46,6 +46,7 @@ def _sqlite_add_columns(connection) -> None:
 
 async def init_db() -> None:
     from app import models  # noqa: F401
+    from app.analysis import models as analysis_models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
