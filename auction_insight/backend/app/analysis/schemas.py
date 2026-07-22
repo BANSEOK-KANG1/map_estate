@@ -217,3 +217,10 @@ class OccupancyPatchIn(BaseModel):
 
 class TimelineEvaluateIn(BaseModel):
     apply_finance_suggest: bool = False
+
+
+class WhatIfIn(BaseModel):
+    assume_deposit_factor: float = 1.0
+    eviction_extra_won: int = 0
+    loan_haircut_won: int = 0
+    exit_drop_ratio: float = 0.0

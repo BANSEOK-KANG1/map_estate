@@ -100,6 +100,8 @@ class AnalysisItemDetail extends AnalysisItemSummary {
   final List<Map<String, dynamic>> rights;
   final List<Map<String, dynamic>> occupancies;
   final Map<String, dynamic> timelineEval;
+  final Map<String, dynamic> cashLadder;
+  final String loanDisclaimer;
 
   AnalysisItemDetail({
     required super.id,
@@ -131,6 +133,8 @@ class AnalysisItemDetail extends AnalysisItemSummary {
     this.rights = const [],
     this.occupancies = const [],
     this.timelineEval = const {},
+    this.cashLadder = const {},
+    this.loanDisclaimer = '',
   });
 
   factory AnalysisItemDetail.fromJson(Map<String, dynamic> json) {
@@ -176,6 +180,8 @@ class AnalysisItemDetail extends AnalysisItemSummary {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList(),
       timelineEval: Map<String, dynamic>.from(json['timeline_eval'] as Map? ?? {}),
+      cashLadder: Map<String, dynamic>.from(json['cash_ladder'] as Map? ?? {}),
+      loanDisclaimer: json['loan_disclaimer'] as String? ?? '',
     );
   }
 }

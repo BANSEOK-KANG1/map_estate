@@ -22,6 +22,7 @@ from app.analysis.schemas import (
     RightPatchIn,
     RuleOut,
     TimelineEvaluateIn,
+    WhatIfIn,
 )
 from app.db import get_db
 
@@ -332,6 +333,36 @@ async def evaluate_timeline(
             db,
             item_id,
             apply_finance_suggest=body.apply_finance_suggest,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.post("/items/{item_id}/finance/apply-tax")
+async def apply_tax_from_rules(item_id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        item = await service.apply_acquisition_tax_from_rules(db, item_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return service.serialize_detail(item)
+
+
+@router.post("/items/{item_id}/what-if")
+async def preview_what_if(
+    item_id: int,
+    body: WhatIfIn = WhatIfIn(),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await service.preview_what_if(
+            db,
+            item_id,
+            assume_deposit_factor=body.assume_deposit_factor,
+            eviction_extra_won=body.eviction_extra_won,
+            loan_haircut_won=body.loan_haircut_won,
+            exit_drop_ratio=body.exit_drop_ratio,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e

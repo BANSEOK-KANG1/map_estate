@@ -303,4 +303,28 @@ class AuctionApi {
     );
     return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
   }
+
+  Future<AnalysisItemDetail> applyAnalysisTaxFromRules(int itemId) async {
+    final res = await _dio.post('/api/analysis/items/$itemId/finance/apply-tax');
+    return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
+  Future<Map<String, dynamic>> previewAnalysisWhatIf(
+    int itemId, {
+    double assumeDepositFactor = 1.0,
+    int evictionExtraWon = 0,
+    int loanHaircutWon = 0,
+    double exitDropRatio = 0.0,
+  }) async {
+    final res = await _dio.post(
+      '/api/analysis/items/$itemId/what-if',
+      data: {
+        'assume_deposit_factor': assumeDepositFactor,
+        'eviction_extra_won': evictionExtraWon,
+        'loan_haircut_won': loanHaircutWon,
+        'exit_drop_ratio': exitDropRatio,
+      },
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
 }
