@@ -12,7 +12,7 @@ import 'package:auction_insight_app/widgets/region_quick_bar.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  static const _desktopBreakpoint = 900.0;
+  static const _desktopBreakpoint = 800.0;
   static const _listPanelWidth = 420.0;
 
   void _openLot(BuildContext context, LotSummary lot) {

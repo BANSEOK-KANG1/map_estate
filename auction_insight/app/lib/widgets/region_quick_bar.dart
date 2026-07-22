@@ -85,6 +85,18 @@ class RegionQuickBar extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+          child: Text(
+            '지역 빠른 선택',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.black.withValues(alpha: 0.45),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -124,7 +136,7 @@ class RegionQuickBar extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: FilterChip(
-                    label: const Text('구·시 전체'),
+                    label: const Text('구시 전체'),
                     selected: wholeSidoSelected,
                     visualDensity: VisualDensity.compact,
                     onSelected: (_) {
@@ -144,11 +156,9 @@ class RegionQuickBar extends ConsumerWidget {
                       visualDensity: VisualDensity.compact,
                       onSelected: (v) {
                         var next = List<String>.from(filters.regionCodes);
-                        // If whole sido was selected, start from empty then add
                         if (wholeSidoSelected) {
                           next = [];
                         }
-                        // Drop codes outside this sido
                         next = next
                             .where((c) => allCodesForSido.contains(c))
                             .toList();
@@ -158,7 +168,6 @@ class RegionQuickBar extends ConsumerWidget {
                           next = next.where((c) => c != r.code).toList();
                         }
                         if (next.isEmpty) {
-                          // Fall back to whole sido
                           next = districtPool.map((e) => e.code).toList();
                         }
                         applyRegionCodes(next);
