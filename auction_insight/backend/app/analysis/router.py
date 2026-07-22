@@ -1,16 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analysis import documents as doc_service
 from app.analysis import service
 from app.analysis.models import RuleConfig
 from app.analysis.money import detect_digit_errors, parse_user_amount, triple_dict
 from app.analysis.rules import seed_rules
 from app.analysis.schemas import (
     AuctionItemCreate,
+    DocumentCorrectIn,
+    EvidenceIn,
     FinanceUpdate,
     MoneyValidateIn,
     MoneyValidateOut,
+    RightFromEvidenceIn,
     RuleOut,
 )
 from app.db import get_db
@@ -134,3 +138,103 @@ async def list_rules(db: AsyncSession = Depends(get_db)):
         )
         for r in rows
     ]
+
+
+@router.post("/items/{item_id}/documents")
+async def upload_document(
+    item_id: int,
+    file: UploadFile = File(...),
+    doc_type: str | None = Form(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    data = await file.read()
+    try:
+        doc = await doc_service.upload_document(
+            db,
+            item_id,
+            filename=file.filename or "upload.pdf",
+            data=data,
+            content_type=file.content_type or "application/pdf",
+            doc_type_hint=doc_type,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    return doc_service.serialize_document(doc)
+
+
+@router.get("/documents/{doc_id}")
+async def get_document(doc_id: int, db: AsyncSession = Depends(get_db)):
+    doc = await doc_service.get_document(db, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="not found")
+    return doc_service.serialize_document(doc, include_pages=True)
+
+
+@router.patch("/documents/{doc_id}")
+async def correct_document(
+    doc_id: int,
+    body: DocumentCorrectIn,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        doc = await doc_service.correct_document(
+            db,
+            doc_id,
+            doc_type=body.doc_type,
+            extracted_text=body.extracted_text,
+            confirm=body.confirm,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return doc_service.serialize_document(doc)
+
+
+@router.post("/documents/{doc_id}/evidence")
+async def document_evidence(
+    doc_id: int,
+    body: EvidenceIn,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await doc_service.page_evidence(
+            db, doc_id, body.page, query=body.query
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.post("/items/{item_id}/rights/from-evidence")
+async def right_from_evidence(
+    item_id: int,
+    body: RightFromEvidenceIn,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        entry = await doc_service.attach_evidence_as_right(
+            db,
+            item_id,
+            doc_id=body.doc_id,
+            page=body.page,
+            label=body.label,
+            kind=body.kind,
+            query=body.query,
+            amount_won=body.amount_won,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return {
+        "id": entry.id,
+        "status": entry.status,
+        "label": entry.label,
+        "evidence_doc_id": entry.evidence_doc_id,
+        "evidence_page": entry.evidence_page,
+        "evidence_excerpt": entry.evidence_excerpt,
+        "rule_track": entry.rule_track,
+        "notes": entry.notes,
+    }

@@ -79,6 +79,10 @@ class AuctionDocument(Base):
     content_type: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     page_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     extracted_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    pages_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    # [{page:1, text:"masked excerpt...", char_count:n}]
+    classify_confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    classify_note: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     masked: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 1 if PII masked
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     user_corrected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

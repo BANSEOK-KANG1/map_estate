@@ -127,3 +127,23 @@ class RuleOut(BaseModel):
     source_url: str
     source_label: str
     notes: str
+
+
+class DocumentCorrectIn(BaseModel):
+    doc_type: str | None = None
+    extracted_text: str | None = None
+    confirm: bool = False
+
+
+class EvidenceIn(BaseModel):
+    page: int = 1
+    query: str = ""
+
+
+class RightFromEvidenceIn(BaseModel):
+    doc_id: int
+    page: int = 1
+    label: str = ""
+    kind: str = "other"
+    query: str = ""
+    amount_won: int | None = None

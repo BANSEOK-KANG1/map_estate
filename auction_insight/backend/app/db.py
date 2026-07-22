@@ -43,6 +43,32 @@ def _sqlite_add_columns(connection) -> None:
     for stmt in alters:
         connection.execute(text(stmt))
 
+    # analysis documents (Phase 2)
+    try:
+        drows = connection.execute(
+            text("PRAGMA table_info(analysis_auction_documents)")
+        ).fetchall()
+    except Exception:  # noqa: BLE001
+        return
+    if not drows:
+        return
+    dcols = {r[1] for r in drows}
+    dalters = []
+    if "pages_json" not in dcols:
+        dalters.append(
+            "ALTER TABLE analysis_auction_documents ADD COLUMN pages_json TEXT DEFAULT '[]'"
+        )
+    if "classify_confidence" not in dcols:
+        dalters.append(
+            "ALTER TABLE analysis_auction_documents ADD COLUMN classify_confidence FLOAT DEFAULT 0"
+        )
+    if "classify_note" not in dcols:
+        dalters.append(
+            "ALTER TABLE analysis_auction_documents ADD COLUMN classify_note VARCHAR(256) DEFAULT ''"
+        )
+    for stmt in dalters:
+        connection.execute(text(stmt))
+
 
 async def init_db() -> None:
     from app import models  # noqa: F401

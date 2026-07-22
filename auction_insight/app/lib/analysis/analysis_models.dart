@@ -97,6 +97,7 @@ class AnalysisItemDetail extends AnalysisItemSummary {
   final List<String> checkNext;
   final String rightsStatusNote;
   final List<Map<String, dynamic>> documents;
+  final List<Map<String, dynamic>> rights;
 
   AnalysisItemDetail({
     required super.id,
@@ -125,6 +126,7 @@ class AnalysisItemDetail extends AnalysisItemSummary {
     this.checkNext = const [],
     this.rightsStatusNote = '',
     this.documents = const [],
+    this.rights = const [],
   });
 
   factory AnalysisItemDetail.fromJson(Map<String, dynamic> json) {
@@ -161,6 +163,9 @@ class AnalysisItemDetail extends AnalysisItemSummary {
       checkNext: (json['check_next'] as List? ?? []).cast<String>(),
       rightsStatusNote: json['rights_status_note'] as String? ?? '',
       documents: (json['documents'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
+      rights: (json['rights'] as List? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList(),
     );

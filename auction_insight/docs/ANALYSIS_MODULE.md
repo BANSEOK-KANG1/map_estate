@@ -35,7 +35,8 @@
 - `app/analysis/rules.py` — RuleConfig 시드/조회 (LTV·DSR·취득세)
 - `app/analysis/storage.py` — DocumentStore 추상화 (local → S3 교체)
 - `app/analysis/service.py` · `schemas.py` · `router.py`
-- `tests/test_money.py` · `tests/test_calculator.py`
+- `app/analysis/pdf_extract.py` · `documents.py` · `pii.py` · `storage.py`
+- `tests/test_money_calculator.py` · `tests/test_analysis_models.py` · `tests/test_pdf_classify.py`
 
 ### Backend (수정)
 - `app/main.py` — analysis router include
@@ -57,7 +58,7 @@
 | 모델 | 핵심 |
 |------|------|
 | **AuctionItem** | source=`court`\|`onbid`, 주소, 감정가/최저가/예정가(**원 단위 정수**), lot_id FK optional |
-| **AuctionDocument** | type, storage_key, page_count, extracted_text, masked, confirmed_at |
+| **AuctionDocument** | type, storage_key, page_count, extracted_text, pages_json, classify_*, masked, confirmed_at |
 | **RightEntry** | kind, priority, amount_won, status=`UNKNOWN`\|`HOLD`\|…, evidence_* |
 | **OccupancyClaim** | housing\|commercial 분리 필드, 대항력 입력, status |
 | **AnalysisRun** | verdict, missing_docs[], notes, created_at |
@@ -69,8 +70,9 @@
 
 ---
 
-## 3. API 설계 (Phase 1)
+## 3. API 설계
 
+### Phase 1
 ```
 POST /api/analysis/items              # 수동 등록
 GET  /api/analysis/items              # 목록 (?source=court|onbid)
@@ -81,7 +83,19 @@ POST /api/analysis/money/validate     # 자릿수 검수
 GET  /api/analysis/rules              # RuleConfig
 ```
 
-Phase 2+: documents upload, rights CRUD, occupancy, LLM summarize (설명 only).
+### Phase 2 (문서함 · 근거)
+```
+POST /api/analysis/items/{id}/documents          # PDF/TXT 업로드 · 추출 · 분류 · 마스킹
+GET  /api/analysis/documents/{doc_id}            # 페이지 미리보기
+PATCH /api/analysis/documents/{doc_id}           # 유형 교정 · confirm
+POST /api/analysis/documents/{doc_id}/evidence   # 페이지 발췌
+POST /api/analysis/items/{id}/rights/from-evidence  # 근거→RightEntry (HOLD/UNKNOWN)
+```
+
+저장: `DocumentStore` (기본 local `ANALYSIS_DOC_ROOT`, 이후 `ANALYSIS_DOC_STORE=s3`).  
+LLM 요약은 Phase 후반 — 날짜·금액·유형 분류는 결정론 코드.
+
+Phase 3+: 권리 CRUD 확정 로직, occupancy, LLM summarize (설명 only).
 
 ---
 
@@ -101,7 +115,7 @@ Phase 2+: documents upload, rights CRUD, occupancy, LLM summarize (설명 only).
 |-------|------|
 | 0 | 감사·설계 (본 문서) |
 | **1** | 수동 등록, 지도·목록·상세 탭 골격, 금액 안전장치, 계산기, 모드 전환 |
-| 2 | PDF·근거 추적·마스킹·Object Storage |
+| **2** | PDF·근거 추적·마스킹·DocumentStore (local→S3 stub) |
 | 3 | 권리·점유 타임라인 (court vs onbid 로직 분리) |
 | 4 | 대출 시나리오 (RuleConfig) |
 | 5 | 공식 데이터 연동 (기존 AuctionLot 링크) |

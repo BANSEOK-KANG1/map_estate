@@ -426,8 +426,28 @@ def serialize_detail(item: AuctionItem) -> dict:
                 "filename": d.filename,
                 "page_count": d.page_count,
                 "masked": bool(d.masked),
+                "classify_confidence": getattr(d, "classify_confidence", 0) or 0,
+                "classify_note": getattr(d, "classify_note", "") or "",
+                "user_corrected": bool(d.user_corrected),
+                "confirmed_at": d.confirmed_at.isoformat() if d.confirmed_at else None,
+                "text_preview": (d.extracted_text or "")[:300],
             }
             for d in item.documents
+        ],
+        "rights": [
+            {
+                "id": r.id,
+                "kind": r.kind,
+                "label": r.label,
+                "amount_won": r.amount_won,
+                "status": r.status,
+                "evidence_doc_id": r.evidence_doc_id,
+                "evidence_page": r.evidence_page,
+                "evidence_excerpt": r.evidence_excerpt,
+                "rule_track": r.rule_track,
+                "notes": r.notes,
+            }
+            for r in item.rights
         ],
         "tabs_hint": [
             "overview",

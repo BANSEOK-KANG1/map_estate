@@ -182,4 +182,73 @@ class AuctionApi {
     final res = await _dio.patch('/api/analysis/items/$id/finance', data: body);
     return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
   }
+
+  Future<Map<String, dynamic>> uploadAnalysisDocument(
+    int itemId, {
+    required List<int> bytes,
+    required String filename,
+    String? docType,
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+      if (docType != null) 'doc_type': docType,
+    });
+    final res = await _dio.post('/api/analysis/items/$itemId/documents', data: form);
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> fetchAnalysisDocument(int docId) async {
+    final res = await _dio.get('/api/analysis/documents/$docId');
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> correctAnalysisDocument(
+    int docId, {
+    String? docType,
+    String? extractedText,
+    bool confirm = false,
+  }) async {
+    final res = await _dio.patch(
+      '/api/analysis/documents/$docId',
+      data: {
+        if (docType != null) 'doc_type': docType,
+        if (extractedText != null) 'extracted_text': extractedText,
+        'confirm': confirm,
+      },
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> documentEvidence(
+    int docId, {
+    int page = 1,
+    String query = '',
+  }) async {
+    final res = await _dio.post(
+      '/api/analysis/documents/$docId/evidence',
+      data: {'page': page, 'query': query},
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> rightFromEvidence(
+    int itemId, {
+    required int docId,
+    int page = 1,
+    String label = '',
+    String kind = 'other',
+    String query = '',
+  }) async {
+    final res = await _dio.post(
+      '/api/analysis/items/$itemId/rights/from-evidence',
+      data: {
+        'doc_id': docId,
+        'page': page,
+        'label': label,
+        'kind': kind,
+        'query': query,
+      },
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
 }
