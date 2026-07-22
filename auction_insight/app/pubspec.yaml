@@ -1,7 +1,7 @@
 name: auction_insight_app
 description: 경·공매 인사이트 — 위치·상권·시가 비교
 publish_to: 'none'
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: ^3.12.2

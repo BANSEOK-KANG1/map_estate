@@ -8,6 +8,8 @@ import 'package:auction_insight_app/providers/providers.dart';
 import 'package:auction_insight_app/theme.dart';
 import 'package:auction_insight_app/utils/format.dart';
 import 'package:auction_insight_app/widgets/lot_map.dart';
+import 'package:auction_insight_app/widgets/pass_watch_card.dart';
+import 'package:auction_insight_app/widgets/total_cost_card.dart';
 
 class LotDetailScreen extends ConsumerWidget {
   const LotDetailScreen({
@@ -208,6 +210,103 @@ class _DetailBody extends StatelessWidget {
         LotMap(items: [lot], focus: lot, height: 190),
         const SizedBox(height: 18),
 
+        _section('입찰 전 워크플로'),
+        if (lot.daysLeft != null || lot.riskFlags.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (lot.daysLeft != null)
+                  _chip(
+                    lot.daysLeft! <= 0 ? '마감' : 'D-${lot.daysLeft}',
+                    accent: true,
+                  ),
+                for (final r in lot.riskFlags) _chip(r, accent: true),
+                if (lot.scores?.discountVsAppraisal != null)
+                  _chip(
+                    '감정 ${formatPct(lot.scores!.discountVsAppraisal)}',
+                    accent: true,
+                  ),
+              ],
+            ),
+          ),
+        if (lot.legal == null)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '권리 상세를 불러오면 체크리스트·임대차·등기 목록이 채워집니다.',
+                style: TextStyle(color: AppTheme.ink.withValues(alpha: 0.55)),
+              ),
+              const SizedBox(height: 10),
+              FilledButton.tonal(
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('온비드 권리 상세 불러오는 중…')),
+                  );
+                  try {
+                    await onFetchDetail();
+                  } catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text('실패: $e')));
+                  }
+                },
+                child: const Text('권리·등기 요약 불러오기'),
+              ),
+            ],
+          )
+        else ...[
+          if (lot.legal!.checklist.isNotEmpty) ...[
+            Text(
+              '필수 확인 ${_checklistDoneHint(lot.legal!.checklist)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.ink.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...lot.legal!.checklist.take(6).map((c) => _checklistTile(c)),
+          ],
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await launchUrl(
+                    Uri.parse(lot.legal!.irosUrl),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+                icon: const Icon(Icons.account_balance_outlined, size: 18),
+                label: const Text('등기부등본'),
+              ),
+              if (lot.sourceUrl.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await launchUrl(
+                      Uri.parse(lot.sourceUrl),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text('온비드 원문'),
+                ),
+              TextButton(
+                onPressed: () => context.push('/guide'),
+                child: const Text('초보 가이드'),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 12),
+        TotalCostCard(lot: lot),
+        const SizedBox(height: 12),
+        PassWatchCard(lot: lot),
+
+        const SizedBox(height: 22),
         // Key facts
         _section('기본 정보'),
         _factGrid([
@@ -380,31 +479,11 @@ class _DetailBody extends StatelessWidget {
           }),
 
         const SizedBox(height: 22),
-        _section('초보 체크리스트 · 전략'),
+        _section('전략 팁 · 권리 상세'),
         if (lot.legal == null)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '권리 상세가 아직 없습니다. 온비드 물건상세를 불러오면 임대차·등기 목록과 체크리스트가 채워집니다.',
-                style: TextStyle(color: AppTheme.ink.withValues(alpha: 0.55)),
-              ),
-              const SizedBox(height: 10),
-              FilledButton.tonal(
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('온비드 권리 상세 불러오는 중…')),
-                  );
-                  try {
-                    await onFetchDetail();
-                  } catch (e) {
-                    messenger.showSnackBar(SnackBar(content: Text('실패: $e')));
-                  }
-                },
-                child: const Text('권리·등기 요약 불러오기'),
-              ),
-            ],
+          Text(
+            '상단에서 권리 상세를 먼저 불러오세요.',
+            style: TextStyle(color: AppTheme.ink.withValues(alpha: 0.55)),
           )
         else ...[
           if (lot.legal!.onbidNotice.isNotEmpty)
@@ -419,8 +498,6 @@ class _DetailBody extends StatelessWidget {
                 ),
               ),
             ),
-          ...lot.legal!.checklist.map((c) => _checklistTile(c)),
-          const SizedBox(height: 8),
           ...lot.legal!.strategyTips.map(
             (t) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
@@ -433,27 +510,6 @@ class _DetailBody extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () async {
-                  await launchUrl(
-                    Uri.parse(lot.legal!.irosUrl),
-                    mode: LaunchMode.externalApplication,
-                  );
-                },
-                icon: const Icon(Icons.account_balance_outlined, size: 18),
-                label: const Text('등기부등본 (iros)'),
-              ),
-              TextButton(
-                onPressed: () => context.push('/guide'),
-                child: const Text('초보 가이드'),
-              ),
-            ],
           ),
         ],
 
@@ -624,6 +680,12 @@ class _DetailBody extends StatelessWidget {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       );
+
+  String _checklistDoneHint(List<ChecklistItem> items) {
+    final ready = items.where((e) => e.status == 'ready').length;
+    final warn = items.where((e) => e.status == 'warn').length;
+    return '· 준비됨 $ready · 주의 $warn · 전체 ${items.length}';
+  }
 
   Widget _chip(String text, {bool accent = false}) {
     return Container(

@@ -74,6 +74,37 @@ def _days_left(lot: AuctionLot) -> int | None:
     return max(0, delta.days)
 
 
+def _risk_flags_brief(lot: AuctionLot) -> list[str]:
+    raw = (lot.detail_json or "").strip()
+    if not raw or raw == "{}":
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, dict):
+        return []
+    out: list[str] = []
+    for flag in data.get("risk_flags") or []:
+        text = str(flag)
+        if any(
+            k in text
+            for k in (
+                "유치권",
+                "법정지상권",
+                "가처분",
+                "가등기",
+                "분묘",
+                "위반건축",
+                "임차권",
+            )
+        ):
+            out.append(text)
+        if len(out) >= 3:
+            break
+    return out
+
+
 def _highlights(lot: AuctionLot) -> list[str]:
     tags: list[str] = []
     if lot.fail_count > 0:
@@ -81,16 +112,16 @@ def _highlights(lot: AuctionLot) -> list[str]:
     days = _days_left(lot)
     if days is not None and days <= 7:
         tags.append(f"D-{days}" if days > 0 else "마감")
-    if lot.discount_vs_market is not None and lot.discount_vs_market >= 0.2:
-        tags.append(f"시세대비 {int(lot.discount_vs_market * 100)}%↓")
-    elif lot.discount_vs_appraisal is not None and lot.discount_vs_appraisal >= 0.25:
-        tags.append(f"감정대비 {int(lot.discount_vs_appraisal * 100)}%↓")
+    if lot.discount_vs_appraisal is not None and lot.discount_vs_appraisal >= 0.15:
+        tags.append(f"감정 {int(lot.discount_vs_appraisal * 100)}%↓")
+    if lot.discount_vs_market is not None and lot.discount_vs_market >= 0.15:
+        tags.append(f"시세 {int(lot.discount_vs_market * 100)}%↓")
     if lot.nearest_station:
         walk = f" 도보{lot.station_walk_minutes}분" if lot.station_walk_minutes else ""
         tags.append(f"{lot.nearest_station}{walk}")
     if lot.market_sample_count and lot.market_sample_count < 8:
         tags.append("시세표본 적음")
-    return tags[:4]
+    return tags[:5]
 
 
 def _thumbnail(lot: AuctionLot) -> str | None:
@@ -140,6 +171,7 @@ def to_summary(lot: AuctionLot, region_name: str | None = None) -> LotSummary:
         scores=_scores_from_lot(lot),
         market=_market_from_lot(lot),
         highlights=_highlights(lot),
+        risk_flags=_risk_flags_brief(lot),
     )
 
 
@@ -433,16 +465,29 @@ async def search_lots(session: AsyncSession, req: SearchRequest) -> tuple[int, l
     q = apply_filters(q)
     count_q = apply_filters(count_q)
     total = (await session.execute(count_q)).scalar_one()
-    # Prefer lots with map coords so the map isn't empty while geocode catches up
-    q = (
-        q.order_by(
+
+    sort = (req.sort or "score").strip().lower()
+    if sort == "deadline":
+        order = (
+            AuctionLot.bid_end_at.asc().nullslast(),
+            AuctionLot.lat.isnot(None).desc(),
+            AuctionLot.total_score.desc().nullslast(),
+        )
+    elif sort == "discount":
+        order = (
+            AuctionLot.discount_vs_appraisal.desc().nullslast(),
+            AuctionLot.lat.isnot(None).desc(),
+            AuctionLot.bid_end_at.asc().nullslast(),
+        )
+    else:
+        # score (default): prefer mapped lots, then insight score
+        order = (
             AuctionLot.lat.isnot(None).desc(),
             AuctionLot.total_score.desc().nullslast(),
             AuctionLot.bid_end_at.asc().nullslast(),
         )
-        .offset(req.offset)
-        .limit(min(req.limit, 200))
-    )
+
+    q = q.order_by(*order).offset(req.offset).limit(min(req.limit, 200))
     rows = (await session.execute(q)).scalars().all()
     return total, [to_summary(r) for r in rows]
 

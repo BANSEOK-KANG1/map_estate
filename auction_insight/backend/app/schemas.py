@@ -121,6 +121,7 @@ class LotSummary(BaseModel):
     scores: InsightScore | None = None
     market: MarketCompare | None = None
     highlights: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
 
 
 class LotDetail(LotSummary):
@@ -152,6 +153,7 @@ class SearchRequest(BaseModel):
     east: float | None = None
     west: float | None = None
     q: str | None = None
+    sort: str = "score"  # score | deadline | discount
     limit: int = 100
     offset: int = 0
 

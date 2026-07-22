@@ -157,22 +157,55 @@ class HomeScreen extends ConsumerWidget {
                         isDesktop ? 16 : 20,
                         4,
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text(
-                            '${result.total}건',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              summary,
-                              textAlign: TextAlign.right,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.ink.withValues(alpha: 0.45),
+                          Row(
+                            children: [
+                              Text(
+                                '${result.total}건',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  summary,
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.ink.withValues(alpha: 0.45),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final (key, label) in const [
+                                  ('score', '추천순'),
+                                  ('deadline', '마감임박'),
+                                  ('discount', '할인율'),
+                                ])
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ChoiceChip(
+                                      label: Text(label),
+                                      selected: filters.sort == key,
+                                      visualDensity: VisualDensity.compact,
+                                      onSelected: (_) {
+                                        ref
+                                            .read(filtersProvider.notifier)
+                                            .state = filters.copyWith(sort: key);
+                                      },
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ],

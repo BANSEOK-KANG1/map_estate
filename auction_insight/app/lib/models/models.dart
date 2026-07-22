@@ -99,6 +99,7 @@ class LotSummary {
   final InsightScore? scores;
   final MarketCompare? market;
   final List<String> highlights;
+  final List<String> riskFlags;
 
   const LotSummary({
     required this.id,
@@ -133,6 +134,7 @@ class LotSummary {
     this.scores,
     this.market,
     this.highlights = const [],
+    this.riskFlags = const [],
   });
 
   factory LotSummary.fromJson(Map<String, dynamic> json) => LotSummary(
@@ -168,6 +170,7 @@ class LotSummary {
         scores: InsightScore.fromJson(json['scores'] as Map<String, dynamic>?),
         market: MarketCompare.fromJson(json['market'] as Map<String, dynamic>?),
         highlights: (json['highlights'] as List? ?? []).cast<String>(),
+        riskFlags: (json['risk_flags'] as List? ?? []).cast<String>(),
       );
 }
 
@@ -264,6 +267,7 @@ class LotDetail extends LotSummary {
     super.scores,
     super.market,
     super.highlights,
+    super.riskFlags,
     this.landArea,
     this.description = '',
     this.photoUrls = const [],
@@ -309,6 +313,7 @@ class LotDetail extends LotSummary {
       scores: base.scores,
       market: base.market,
       highlights: base.highlights,
+      riskFlags: base.riskFlags,
       landArea: (json['land_area'] as num?)?.toDouble(),
       description: json['description'] as String? ?? '',
       photoUrls: (json['photo_urls'] as List? ?? []).cast<String>(),
@@ -482,6 +487,7 @@ class SearchFilters {
   final int? minFailCount;
   final String? status;
   final String? q;
+  final String sort;
 
   const SearchFilters({
     this.sources = const ['onbid', 'court'],
@@ -492,6 +498,7 @@ class SearchFilters {
     this.minFailCount,
     this.status = 'active',
     this.q,
+    this.sort = 'score',
   });
 
   SearchFilters copyWith({
@@ -503,6 +510,7 @@ class SearchFilters {
     int? minFailCount,
     String? status,
     String? q,
+    String? sort,
   }) =>
       SearchFilters(
         sources: sources ?? this.sources,
@@ -513,6 +521,7 @@ class SearchFilters {
         minFailCount: minFailCount ?? this.minFailCount,
         status: status ?? this.status,
         q: q ?? this.q,
+        sort: sort ?? this.sort,
       );
 
   Map<String, dynamic> toJson() => {
@@ -524,6 +533,7 @@ class SearchFilters {
         if (minFailCount != null) 'min_fail_count': minFailCount,
         if (status != null) 'status': status,
         if (q != null && q!.isNotEmpty) 'q': q,
+        'sort': sort,
         'limit': 100,
       };
 }

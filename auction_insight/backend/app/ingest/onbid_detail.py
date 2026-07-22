@@ -51,17 +51,37 @@ _FIELD_LABELS: dict[str, str] = {
     "leasEndYmd": "종료일",
     "fxdtDrtRstcYn": "대항력",
     "prrtRpyYn": "우선변제",
+    "prrtRpyAmt": "우선변제액",
     "ocpySttsNm": "점유상태",
     "ocpyNm": "점유자",
     "ocpyRelNm": "점유관계",
+    "ocpyCntn": "점유내용",
     "rgstKndNm": "등기종류",
     "rgstPrpsNm": "등기목적",
     "rghtAmt": "채권액",
     "rgstYmd": "등기일",
-    "prrtRpyAmt": "우선변제액",
+    "rgstNo": "등기번호",
+    "rqstOrgNm": "요청기관",
+    "orgNm": "기관",
+    "crtrRghtYn": "말소기준 관련",
+    "tkovYn": "인수여부",
+    "tkovAmt": "인수금액",
+    "bondMaxAmt": "채권최고액",
+    "mortgageeNm": "근저당권자",
+    "creditorNm": "채권자",
+    "debtorNm": "채무자",
+    "addr": "주소",
+    "ldCode": "법정동코드",
+    "bldNm": "건물명",
+    "dongNm": "동",
+    "hoNm": "호",
+    "area": "면적",
+    "exclArea": "전용면적",
     "rmk": "비고",
     "rmkCont": "비고",
     "etcCont": "기타",
+    "note": "비고",
+    "desc": "설명",
 }
 
 
@@ -71,6 +91,17 @@ def _pick(row: dict[str, Any], *keys: str) -> str:
         if val:
             return val
     return ""
+
+
+def _humanize_key(key: str) -> str:
+    if key in _FIELD_LABELS:
+        return _FIELD_LABELS[key]
+    # camelCase / snake → spaced guess
+    import re
+
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", key)
+    spaced = spaced.replace("_", " ").strip()
+    return spaced or key
 
 
 def _normalize_rows(items: list[Any], kind: str) -> list[dict[str, Any]]:
@@ -126,7 +157,7 @@ def _normalize_rows(items: list[Any], kind: str) -> list[dict[str, Any]]:
             fields.append(
                 {
                     "key": key,
-                    "label": _FIELD_LABELS.get(key, key),
+                    "label": _FIELD_LABELS.get(key) or _humanize_key(key),
                     "value": text[:240],
                 }
             )
@@ -142,7 +173,7 @@ def _normalize_rows(items: list[Any], kind: str) -> list[dict[str, Any]]:
                     fields.append(
                         {
                             "key": key,
-                            "label": _FIELD_LABELS.get(key, key),
+                            "label": _FIELD_LABELS.get(key) or _humanize_key(key),
                             "value": text[:240],
                         }
                     )
