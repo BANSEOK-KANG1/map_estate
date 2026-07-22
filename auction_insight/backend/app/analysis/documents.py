@@ -10,6 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.analysis.models import AuctionDocument, RightEntry
 from app.analysis.pdf_extract import classify_document, excerpt_around, extract_pdf_pages
 from app.analysis.pii import mask_pii
+from app.analysis.security import (
+    assert_upload_allowed,
+    detect_suffix,
+    sanitize_filename,
+)
 from app.analysis.service import get_item, recompute
 from app.analysis.storage import get_document_store
 
@@ -26,17 +31,18 @@ async def upload_document(
     item = await get_item(session, item_id)
     if item is None:
         raise LookupError("item not found")
-    if not data:
-        raise ValueError("empty file")
     if len(data) > 25 * 1024 * 1024:
         raise ValueError("file too large (max 25MB)")
 
+    safe_name = sanitize_filename(filename)
+    content_type = content_type or "application/octet-stream"
+    assert_upload_allowed(filename=safe_name, content_type=content_type, data=data)
+
     store = get_document_store()
-    suffix = ".pdf"
-    lower = filename.lower()
-    if lower.endswith(".txt"):
-        suffix = ".txt"
-    storage_key = await store.put(data, content_type=content_type or "application/pdf", suffix=suffix)
+    suffix = detect_suffix(safe_name, content_type)
+    storage_key = await store.put(
+        data, content_type=content_type, suffix=suffix
+    )
 
     if suffix == ".txt" or content_type.startswith("text/"):
         text = data.decode("utf-8", errors="replace")
@@ -44,7 +50,7 @@ async def upload_document(
         pages = [{"page": 1, "text": text[:8000], "char_count": min(len(text), 8000)}]
         page_count = 1
         full = text[:200_000]
-        doc_type, conf, note = classify_document(full, filename=filename)
+        doc_type, conf, note = classify_document(full, filename=safe_name)
         any_masked = masked
     else:
         extracted = extract_pdf_pages(data)
@@ -68,9 +74,9 @@ async def upload_document(
     doc = AuctionDocument(
         item_id=item_id,
         doc_type=doc_type,
-        filename=filename[:250],
+        filename=safe_name[:250],
         storage_key=storage_key,
-        content_type=content_type or "application/pdf",
+        content_type=content_type,
         page_count=page_count,
         extracted_text=full,
         pages_json=json.dumps(pages, ensure_ascii=False),
@@ -102,7 +108,6 @@ def serialize_document(doc: AuctionDocument, *, include_pages: bool = True) -> d
         "item_id": doc.item_id,
         "doc_type": doc.doc_type,
         "filename": doc.filename,
-        "storage_key": doc.storage_key,
         "content_type": doc.content_type,
         "page_count": doc.page_count,
         "masked": bool(doc.masked),

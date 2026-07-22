@@ -5,13 +5,14 @@ Flutter + FastAPI로 **법원 경매·캠코 공매** 물건을 지도에서 보
 
 기존 `map_estate`(원룸 실거래)와는 독립 앱입니다. 같은 저장소에만 공존합니다.
 
-## 경·공매 분석 랩 (Phase 1+)
+## 경·공매 분석 랩 (Phase 1–6)
 
 심층 분석 도메인은 기존 `AuctionLot` 스크리닝과 분리된 모듈입니다.
 
 - 설계: [docs/ANALYSIS_MODULE.md](docs/ANALYSIS_MODULE.md)
-- API: `/api/analysis/*` (수동 등록 · 총투입액 · 입찰상한 · RuleConfig)
-- UI: 홈 모드 [실거래|법원경매|온비드공매] · FAB「분석 등록」· `/analysis/:id` 7탭
+- 보안·배포: [docs/PHASE6_SECURITY_DEPLOY.md](docs/PHASE6_SECURITY_DEPLOY.md)
+- API: `/api/analysis/*` (등록 · 문서함 · 권리·점유 · 대출 · lot 연동)
+- UI: 홈 모드 [실거래|법원경매|온비드공매] · 물건상세「심층 분석」· `/analysis/:id` 7탭
 
 AI는 입찰을 결정하지 않으며, 필수문서 부족 시 권리 확정 금지·초보자 입찰 금지를 표시합니다.
 

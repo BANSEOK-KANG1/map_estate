@@ -207,9 +207,27 @@ async def _bootstrap_if_empty() -> None:
         logger.exception("bootstrap failed")
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
+        # API JSON responses: no aggressive CSP that breaks Flutter web assets
+        if request.url.path.startswith("/api"):
+            response.headers.setdefault(
+                "Cache-Control", "no-store"
+            )
+        return response
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Auction Insight API", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(PrivateNetworkCorsMiddleware)
     app.add_middleware(
         CORSMiddleware,

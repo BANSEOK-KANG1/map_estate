@@ -200,3 +200,4 @@ class HealthOut(BaseModel):
     demo_lot_count: int = 0
     keys: dict[str, bool] = Field(default_factory=dict)
     onbid_reachable: bool | None = None
+    analysis: dict = Field(default_factory=dict)

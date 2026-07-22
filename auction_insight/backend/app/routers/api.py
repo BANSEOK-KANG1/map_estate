@@ -89,6 +89,22 @@ async def health(
         mode = "mixed"
     else:
         mode = "demo"
+
+    analysis_meta: dict = {}
+    try:
+        from app.analysis.models import AuctionItem
+        from app.analysis.storage import document_store_status
+
+        analysis_n = (
+            await db.execute(select(func.count(AuctionItem.id)))
+        ).scalar_one()
+        analysis_meta = {
+            "item_count": analysis_n,
+            "doc_store": document_store_status(),
+        }
+    except Exception:  # noqa: BLE001
+        analysis_meta = {"item_count": 0, "doc_store": {"kind": "unknown"}}
+
     return HealthOut(
         status="ok",
         mode=mode,
@@ -101,6 +117,7 @@ async def health(
             "molit": bool(settings.molit_service_key),
             "kakao": bool(settings.kakao_rest_key),
         },
+        analysis=analysis_meta,
     )
 
 
