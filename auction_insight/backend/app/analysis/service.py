@@ -27,8 +27,14 @@ from app.analysis.models import (
     AuctionItem,
     FinanceProfile,
     LoanScenario,
+    OccupancyClaim,
 )
 from app.analysis.money import detect_digit_errors, parse_user_amount, triple_dict
+from app.analysis.lot_link import (
+    linked_lot_dict,
+    lot_to_create_body,
+    occupancy_stubs_from_lot,
+)
 from app.analysis.rights_eval import apply_evaluation
 from app.analysis.rules import get_rule, seed_rules, usage_bucket
 from app.analysis.schemas import AuctionItemCreate, FinanceUpdate
@@ -54,6 +60,7 @@ def _resolve_won(
 
 
 async def create_item(session: AsyncSession, body: AuctionItemCreate) -> AuctionItem:
+
     await seed_rules(session)
     if body.source not in ("court", "onbid"):
         raise ValueError("source must be court or onbid")
@@ -98,6 +105,71 @@ async def create_item(session: AsyncSession, body: AuctionItemCreate) -> Auction
     await session.refresh(item)
     await recompute(session, item.id)
     return await get_item(session, item.id)  # type: ignore[return-value]
+
+
+async def create_item_from_lot(
+    session: AsyncSession,
+    lot_id: int,
+    *,
+    reuse_existing: bool = True,
+) -> AuctionItem:
+    """Import screening AuctionLot into analysis lab (idempotent by default)."""
+    from app.services.lots import get_lot
+
+    lot = await get_lot(session, lot_id)
+    if lot is None:
+        raise LookupError("lot not found")
+    if reuse_existing:
+        existing = (
+            await session.execute(
+                select(AuctionItem)
+                .where(AuctionItem.lot_id == lot_id)
+                .order_by(AuctionItem.id.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            return await get_item(session, existing.id)  # type: ignore[return-value]
+
+    body = lot_to_create_body(lot)
+    item = await create_item(session, body)
+    # refresh mutable fields from lot
+    fresh = await get_item(session, item.id)
+    if fresh is None:
+        raise LookupError("item missing after create")
+    if lot.region_code:
+        fresh.region_code = lot.region_code
+    for stub in occupancy_stubs_from_lot(lot):
+        session.add(
+            OccupancyClaim(
+                item_id=fresh.id,
+                claim_kind=stub["claim_kind"],
+                occupant_label=stub["occupant_label"],
+                status="HOLD",
+                notes=stub["notes"],
+                evidence_excerpt="",
+            )
+        )
+    await session.commit()
+    await recompute(session, fresh.id)
+    return await get_item(session, fresh.id)  # type: ignore[return-value]
+
+
+async def linked_lot_snapshot(session: AsyncSession, lot_id: int | None) -> dict | None:
+    if not lot_id:
+        return None
+    from app.services.lots import get_lot
+
+    lot = await get_lot(session, lot_id)
+    if lot is None:
+        return None
+    return linked_lot_dict(lot)
+
+
+async def serialize_detail_async(session: AsyncSession, item: AuctionItem) -> dict:
+    detail = serialize_detail(item)
+    detail["linked_lot"] = await linked_lot_snapshot(session, item.lot_id)
+    return detail
 
 
 async def get_item(session: AsyncSession, item_id: int) -> AuctionItem | None:

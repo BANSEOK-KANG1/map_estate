@@ -102,6 +102,7 @@ class AnalysisItemDetail extends AnalysisItemSummary {
   final Map<String, dynamic> timelineEval;
   final Map<String, dynamic> cashLadder;
   final String loanDisclaimer;
+  final Map<String, dynamic>? linkedLot;
 
   AnalysisItemDetail({
     required super.id,
@@ -135,6 +136,7 @@ class AnalysisItemDetail extends AnalysisItemSummary {
     this.timelineEval = const {},
     this.cashLadder = const {},
     this.loanDisclaimer = '',
+    this.linkedLot,
   });
 
   factory AnalysisItemDetail.fromJson(Map<String, dynamic> json) {
@@ -182,6 +184,9 @@ class AnalysisItemDetail extends AnalysisItemSummary {
       timelineEval: Map<String, dynamic>.from(json['timeline_eval'] as Map? ?? {}),
       cashLadder: Map<String, dynamic>.from(json['cash_ladder'] as Map? ?? {}),
       loanDisclaimer: json['loan_disclaimer'] as String? ?? '',
+      linkedLot: json['linked_lot'] is Map
+          ? Map<String, dynamic>.from(json['linked_lot'] as Map)
+          : null,
     );
   }
 }

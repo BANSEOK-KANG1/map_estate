@@ -175,6 +175,17 @@ class AuctionApi {
     return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
   }
 
+  Future<AnalysisItemDetail> createAnalysisItemFromLot(
+    int lotId, {
+    bool forceNew = false,
+  }) async {
+    final res = await _dio.post(
+      '/api/analysis/items/from-lot/$lotId',
+      queryParameters: {if (forceNew) 'force_new': true},
+    );
+    return AnalysisItemDetail.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
   Future<AnalysisItemDetail> patchAnalysisFinance(
     int id,
     Map<String, dynamic> body,

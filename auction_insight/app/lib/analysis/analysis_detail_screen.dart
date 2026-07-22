@@ -77,6 +77,11 @@ class _OverviewTab extends StatelessWidget {
         _moneyCard('감정가', item.appraisal),
         _moneyCard('최저가', item.minBid),
         _moneyCard('공매예정가 등', item.plannedPrice),
+        if (item.linkedLot != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('연결 스크리닝 lot #${item.linkedLot!['lot_id']}'),
+          ),
         if (item.digitWarnings.isNotEmpty) ...[
           const SizedBox(height: 8),
           ...item.digitWarnings.map(
@@ -822,19 +827,78 @@ class _MarketTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final linked = item.linkedLot;
+    final market = linked?['market'] as Map?;
+    final infra = linked?['infra'] as Map?;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const Text(
-          '시세·수익성 (Phase 1 stub)',
+          '시세·인프라 (공식 스크리닝 연동)',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
-        const Text(
-          '국토부 실거래·낙찰통계 연동은 Phase 5. 지금은 보수적 처분가와 총투입액·입찰상한으로 안전마진을 봅니다.',
-        ),
-        if (item.bidCeiling != null)
+        if (linked == null) ...[
+          const Text(
+            '연결된 AuctionLot이 없습니다. 목록/지도에서 「심층 분석」으로 가져오거나 수동 등록하세요.',
+          ),
+        ] else ...[
+          Text('연결 lot #${linked['lot_id']} · ${linked['source']}'),
+          Text('${linked['title'] ?? ''}'),
+          Text('${linked['address'] ?? ''}'),
+          const SizedBox(height: 10),
+          Text(
+            '시세 중위 ${formatManwon((market?['median_manwon'] as num?)?.round())} · '
+            '표본 ${market?['sample_count'] ?? 0}건',
+          ),
+          if (market?['pyeong_manwon'] != null)
+            Text('평당 ${(market?['pyeong_manwon'] as num?)?.toStringAsFixed(0)}만원'),
+          Text('${market?['note'] ?? ''}'),
+          if (market?['discount_vs_market'] != null)
+            Text(
+              '시세 대비 할인 ${((market?['discount_vs_market'] as num) * 100).toStringAsFixed(0)}%',
+            ),
+          if (market?['discount_vs_appraisal'] != null)
+            Text(
+              '감정 대비 할인 ${((market?['discount_vs_appraisal'] as num) * 100).toStringAsFixed(0)}%',
+            ),
+          const SizedBox(height: 10),
+          if ((infra?['nearest_station'] as String?)?.isNotEmpty == true)
+            Text(
+              '역세권 ${infra?['nearest_station']}'
+              '${infra?['station_walk_minutes'] != null ? ' 도보 ${infra?['station_walk_minutes']}분' : ''}',
+            ),
+          if (infra?['total_score'] != null)
+            Text('스크리닝 점수 ${infra?['total_score']}'),
+          if ((linked['risk_flags'] as List?)?.isNotEmpty == true) ...[
+            const SizedBox(height: 8),
+            const Text('위험 힌트', style: TextStyle(fontWeight: FontWeight.w600)),
+            ...((linked['risk_flags'] as List).map((e) => Text('· $e'))),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            '${linked['disclaimer'] ?? ''}',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.ink.withValues(alpha: 0.55),
+            ),
+          ),
+        ],
+        const Divider(),
+        if (item.bidCeiling != null) ...[
+          Text(
+            '입찰상한 ${formatManwon((item.bidCeiling!['bid_ceiling_won'] as num?)?.round())}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
           Text('공식: ${item.bidCeiling!['formula']}'),
+        ],
+        Text(
+          '보수적 처분가 vs 총투입액으로 안전마진을 보세요. AI가 입찰을 결정하지 않습니다.',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.ink.withValues(alpha: 0.55),
+          ),
+        ),
       ],
     );
   }

@@ -59,7 +59,24 @@ async def create_item(body: AuctionItemCreate, db: AsyncSession = Depends(get_db
         item = await service.create_item(db, body)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    return service.serialize_detail(item)
+    return await service.serialize_detail_async(db, item)
+
+
+@router.post("/items/from-lot/{lot_id}")
+async def create_item_from_lot(
+    lot_id: int,
+    force_new: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        item = await service.create_item_from_lot(
+            db, lot_id, reuse_existing=not force_new
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return await service.serialize_detail_async(db, item)
 
 
 @router.get("/items")
@@ -80,6 +97,7 @@ async def list_items(
                 "address": it.address,
                 "usage": it.usage,
                 "case_no": it.case_no,
+                "lot_id": it.lot_id,
                 "appraisal": triple_dict(it.appraisal_won),
                 "min_bid": triple_dict(it.min_bid_won),
                 "planned_price": triple_dict(it.planned_price_won),
@@ -102,7 +120,7 @@ async def get_item(item_id: int, db: AsyncSession = Depends(get_db)):
     item = await service.get_item(db, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="not found")
-    return service.serialize_detail(item)
+    return await service.serialize_detail_async(db, item)
 
 
 @router.patch("/items/{item_id}/finance")
@@ -115,7 +133,7 @@ async def patch_finance(
         item = await service.update_finance(db, item_id, body)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    return service.serialize_detail(item)
+    return await service.serialize_detail_async(db, item)
 
 
 @router.post("/items/{item_id}/recompute")
@@ -124,7 +142,7 @@ async def recompute(item_id: int, db: AsyncSession = Depends(get_db)):
         item = await service.recompute(db, item_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    return service.serialize_detail(item)
+    return await service.serialize_detail_async(db, item)
 
 
 @router.get("/rules", response_model=list[RuleOut])
@@ -346,7 +364,7 @@ async def apply_tax_from_rules(item_id: int, db: AsyncSession = Depends(get_db))
         raise HTTPException(status_code=404, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    return service.serialize_detail(item)
+    return await service.serialize_detail_async(db, item)
 
 
 @router.post("/items/{item_id}/what-if")

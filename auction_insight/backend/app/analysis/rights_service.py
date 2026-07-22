@@ -236,9 +236,9 @@ async def evaluate_item(
     await session.commit()
     await recompute(session, item_id)
     item = await get_item(session, item_id)
-    from app.analysis.service import serialize_detail
+    from app.analysis.service import serialize_detail_async
 
-    detail = serialize_detail(item)  # type: ignore[arg-type]
+    detail = await serialize_detail_async(session, item)  # type: ignore[arg-type]
     detail["timeline_eval"] = result
     return detail
 

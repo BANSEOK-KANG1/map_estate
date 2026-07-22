@@ -72,6 +72,12 @@ class LotDetailScreen extends ConsumerWidget {
               )),
             );
           },
+          onStartAnalysis: () async {
+            final item =
+                await ref.read(apiProvider).createAnalysisItemFromLot(lotId);
+            if (!context.mounted) return;
+            context.push('/analysis/${item.id}');
+          },
         ),
       ),
     );
@@ -156,14 +162,40 @@ class _DetailError extends StatelessWidget {
   }
 }
 
-class _DetailBody extends StatelessWidget {
+class _DetailBody extends StatefulWidget {
   const _DetailBody({
     required this.lot,
     required this.onFetchDetail,
+    required this.onStartAnalysis,
   });
 
   final LotDetail lot;
   final Future<void> Function() onFetchDetail;
+  final Future<void> Function() onStartAnalysis;
+
+  @override
+  State<_DetailBody> createState() => _DetailBodyState();
+}
+
+class _DetailBodyState extends State<_DetailBody> {
+  bool _analyzing = false;
+  String? _analysisError;
+
+  LotDetail get lot => widget.lot;
+
+  Future<void> _goAnalyze() async {
+    setState(() {
+      _analyzing = true;
+      _analysisError = null;
+    });
+    try {
+      await widget.onStartAnalysis();
+    } catch (e) {
+      if (mounted) setState(() => _analysisError = '$e');
+    } finally {
+      if (mounted) setState(() => _analyzing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,6 +243,30 @@ class _DetailBody extends StatelessWidget {
         const SizedBox(height: 18),
 
         _section('입찰 전 워크플로'),
+        FilledButton.icon(
+          onPressed: _analyzing ? null : _goAnalyze,
+          icon: _analyzing
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.science_outlined),
+          label: Text(_analyzing ? '분석 준비 중…' : '심층 분석 열기'),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '공식 스크리닝 데이터를 분석 랩으로 가져옵니다. 권리·점유는 문서 근거 없이 확정하지 않습니다.',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.ink.withValues(alpha: 0.55),
+          ),
+        ),
+        if (_analysisError != null) ...[
+          const SizedBox(height: 6),
+          Text(_analysisError!, style: const TextStyle(color: Colors.redAccent)),
+        ],
+        const SizedBox(height: 12),
         if (lot.daysLeft != null || lot.riskFlags.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -248,7 +304,7 @@ class _DetailBody extends StatelessWidget {
                     const SnackBar(content: Text('온비드 권리 상세 불러오는 중…')),
                   );
                   try {
-                    await onFetchDetail();
+                    await widget.onFetchDetail();
                   } catch (e) {
                     messenger.showSnackBar(SnackBar(content: Text('실패: $e')));
                   }
