@@ -213,6 +213,7 @@ async def lot_detail_by_key(
     source: str,
     external_id: str,
     enrich: bool = False,
+    fetch_detail: bool = False,
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> LotDetail:
@@ -220,8 +221,15 @@ async def lot_detail_by_key(
     lot = await get_lot_by_key(db, source, external_id)
     if lot is None:
         raise HTTPException(status_code=404, detail="Lot not found")
-    if enrich:
-        await enrich_lot(db, settings, lot)
+    if enrich or fetch_detail:
+        if enrich:
+            await enrich_lot(db, settings, lot)
+        else:
+            from app.ingest.onbid_detail import enrich_lot_onbid_detail
+
+            await enrich_lot_onbid_detail(db, settings, lot)
+            await db.commit()
+            await db.refresh(lot)
         lot = await get_lot_by_key(db, source, external_id)
         assert lot is not None
     return to_detail(lot)
@@ -231,14 +239,22 @@ async def lot_detail_by_key(
 async def lot_detail(
     lot_id: int,
     enrich: bool = False,
+    fetch_detail: bool = False,
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> LotDetail:
     lot = await get_lot(db, lot_id)
     if lot is None:
         raise HTTPException(status_code=404, detail="Lot not found")
-    if enrich:
-        await enrich_lot(db, settings, lot)
+    if enrich or fetch_detail:
+        if enrich:
+            await enrich_lot(db, settings, lot)
+        else:
+            from app.ingest.onbid_detail import enrich_lot_onbid_detail
+
+            await enrich_lot_onbid_detail(db, settings, lot)
+            await db.commit()
+            await db.refresh(lot)
         lot = await get_lot(db, lot_id)
         assert lot is not None
     return to_detail(lot)

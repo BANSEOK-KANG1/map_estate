@@ -41,6 +41,27 @@ class PoiOut(BaseModel):
     places: list[dict] = Field(default_factory=list)
 
 
+class LegalRowField(BaseModel):
+    key: str = ""
+    label: str = ""
+    value: str = ""
+
+
+class LegalInfoRow(BaseModel):
+    title: str = ""
+    subtitle: str = ""
+    fields: list[LegalRowField] = Field(default_factory=list)
+
+
+class ChecklistItem(BaseModel):
+    id: str
+    title: str
+    detail: str = ""
+    priority: int = 2  # 1=필수, 2=권장, 3=팁
+    status: str = "todo"  # todo | ready | tip | warn
+    link: str | None = None
+
+
 class LegalRiskOut(BaseModel):
     """온비드 물건상세 기반 권리·특약 요약 (확정 권리분석 아님)."""
 
@@ -58,6 +79,13 @@ class LegalRiskOut(BaseModel):
     bid_rounds: list[dict] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
     bid_info_status: str | None = None
+    lease_rows: list[LegalInfoRow] = Field(default_factory=list)
+    occupy_rows: list[LegalInfoRow] = Field(default_factory=list)
+    registry_rows: list[LegalInfoRow] = Field(default_factory=list)
+    checklist: list[ChecklistItem] = Field(default_factory=list)
+    strategy_tips: list[str] = Field(default_factory=list)
+    iros_url: str = "https://www.iros.go.kr"
+    onbid_notice: str = ""
 
 
 class LotSummary(BaseModel):

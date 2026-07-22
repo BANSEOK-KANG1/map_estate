@@ -72,6 +72,7 @@ class AuctionApi {
   Future<LotDetail> fetchLot(
     int id, {
     bool enrich = false,
+    bool fetchDetail = false,
     String? source,
     String? externalId,
   }) async {
@@ -87,6 +88,7 @@ class AuctionApi {
             'source': source,
             'external_id': externalId,
             if (enrich) 'enrich': true,
+            if (fetchDetail) 'fetch_detail': true,
           },
         );
         return LotDetail.fromJson(res.data as Map<String, dynamic>);
@@ -97,7 +99,10 @@ class AuctionApi {
     }
     final res = await _dio.get(
       '/api/lots/$id',
-      queryParameters: {if (enrich) 'enrich': true},
+      queryParameters: {
+        if (enrich) 'enrich': true,
+        if (fetchDetail) 'fetch_detail': true,
+      },
     );
     return LotDetail.fromJson(res.data as Map<String, dynamic>);
   }

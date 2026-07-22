@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:auction_insight_app/screens/beginner_guide_screen.dart';
 import 'package:auction_insight_app/screens/home_screen.dart';
 import 'package:auction_insight_app/screens/lot_detail_screen.dart';
 import 'package:auction_insight_app/screens/settings_screen.dart';
@@ -28,6 +29,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/settings',
       builder: (context, state) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: '/guide',
+      builder: (context, state) => const BeginnerGuideScreen(),
     ),
   ],
 );

@@ -121,6 +121,41 @@ class SettingsScreen extends ConsumerWidget {
                 ],
                 if (h.keys['onbid'] == true) ...[
                   const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('온비드 권리 상세 enrich 중…')),
+                      );
+                      try {
+                        final res = await ref.read(apiProvider).enrichLots(
+                              limit: 40,
+                              fetchMarket: false,
+                              fetchPois: false,
+                              fetchDetail: true,
+                              missingCoordsOnly: false,
+                              balanceBySido: true,
+                            );
+                        ref.invalidate(searchProvider);
+                        ref.invalidate(healthProvider);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '권리 detail ${res['enriched']}건 · ${res['message'] ?? res['status']}',
+                            ),
+                          ),
+                        );
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('실패: $e')),
+                        );
+                      }
+                    },
+                    child: const Text('권리·등기 요약 채우기 (온비드 상세)'),
+                  ),
+                ],
+                if (h.keys['onbid'] == true) ...[
+                  const SizedBox(height: 8),
                   FilledButton(
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);

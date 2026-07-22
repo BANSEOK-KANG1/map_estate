@@ -82,6 +82,11 @@ class HomeScreen extends ConsumerWidget {
                       icon: const Icon(Icons.tune),
                     ),
                     IconButton(
+                      tooltip: '초보 가이드',
+                      onPressed: () => context.push('/guide'),
+                      icon: const Icon(Icons.menu_book_outlined),
+                    ),
+                    IconButton(
                       tooltip: '설정',
                       onPressed: () => context.push('/settings'),
                       icon: const Icon(Icons.settings_outlined),

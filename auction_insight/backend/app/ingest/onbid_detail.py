@@ -40,6 +40,122 @@ def _text(v: Any) -> str:
     return str(v).strip()
 
 
+_FIELD_LABELS: dict[str, str] = {
+    "lesseeNm": "임차인",
+    "leasNm": "임차인",
+    "nm": "성명",
+    "leasGrcn": "임대차 기간",
+    "grnteAmt": "보증금",
+    "mnthRentAmt": "월세",
+    "leasStrtYmd": "시작일",
+    "leasEndYmd": "종료일",
+    "fxdtDrtRstcYn": "대항력",
+    "prrtRpyYn": "우선변제",
+    "ocpySttsNm": "점유상태",
+    "ocpyNm": "점유자",
+    "ocpyRelNm": "점유관계",
+    "rgstKndNm": "등기종류",
+    "rgstPrpsNm": "등기목적",
+    "rghtAmt": "채권액",
+    "rgstYmd": "등기일",
+    "prrtRpyAmt": "우선변제액",
+    "rmk": "비고",
+    "rmkCont": "비고",
+    "etcCont": "기타",
+}
+
+
+def _pick(row: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        val = _text(row.get(key))
+        if val:
+            return val
+    return ""
+
+
+def _normalize_rows(items: list[Any], kind: str) -> list[dict[str, Any]]:
+    """Turn Onbid list items into UI-friendly rows (title + labeled fields)."""
+    rows: list[dict[str, Any]] = []
+    for raw in items:
+        if not isinstance(raw, dict):
+            continue
+        if kind == "lease":
+            title = _pick(raw, "lesseeNm", "leasNm", "nm") or "임차 정보"
+            subtitle = " · ".join(
+                p
+                for p in (
+                    _pick(raw, "grnteAmt") and f"보증 {_pick(raw, 'grnteAmt')}",
+                    _pick(raw, "mnthRentAmt") and f"월 {_pick(raw, 'mnthRentAmt')}",
+                    _pick(raw, "leasGrcn", "leasStrtYmd"),
+                )
+                if p
+            )
+        elif kind == "occupy":
+            title = _pick(raw, "ocpyNm", "nm", "ocpyRelNm") or "점유 정보"
+            subtitle = _pick(raw, "ocpySttsNm", "ocpyRelNm")
+        else:  # registry
+            title = _pick(raw, "rgstPrpsNm", "rgstKndNm") or "등기·우선변제"
+            subtitle = " · ".join(
+                p
+                for p in (
+                    _pick(raw, "rgstKndNm"),
+                    _pick(raw, "rghtAmt") and f"채권 {_pick(raw, 'rghtAmt')}",
+                    _pick(raw, "rgstYmd"),
+                )
+                if p
+            )
+
+        fields: list[dict[str, str]] = []
+        used = {
+            "lesseeNm",
+            "leasNm",
+            "nm",
+            "ocpyNm",
+            "ocpyRelNm",
+            "rgstPrpsNm",
+            "rgstKndNm",
+        }
+        for key, value in raw.items():
+            if key in used:
+                continue
+            if isinstance(value, (dict, list)) or value is None:
+                continue
+            text = _text(value)
+            if not text or text in ("null", "None"):
+                continue
+            fields.append(
+                {
+                    "key": key,
+                    "label": _FIELD_LABELS.get(key, key),
+                    "value": text[:240],
+                }
+            )
+            if len(fields) >= 10:
+                break
+        # If title-only and no fields, dump first string values
+        if not fields:
+            for key, value in list(raw.items())[:8]:
+                if isinstance(value, (dict, list)) or value is None:
+                    continue
+                text = _text(value)
+                if text:
+                    fields.append(
+                        {
+                            "key": key,
+                            "label": _FIELD_LABELS.get(key, key),
+                            "value": text[:240],
+                        }
+                    )
+        rows.append(
+            {
+                "title": title,
+                "subtitle": subtitle,
+                "fields": fields,
+            }
+        )
+    return rows
+
+
 def build_legal_summary(item: dict[str, Any]) -> dict[str, Any]:
     """Normalize detail payload for API/UI."""
     etc = _text(item.get("cltrEtcCont"))
@@ -130,13 +246,19 @@ def build_legal_summary(item: dict[str, Any]) -> dict[str, Any]:
         "leases": leases[:20],
         "occupy": occupy[:20],
         "registry": registry[:20],
+        "lease_rows": _normalize_rows(leases[:20], "lease"),
+        "occupy_rows": _normalize_rows(occupy[:20], "occupy"),
+        "registry_rows": _normalize_rows(registry[:20], "registry"),
         "appraisals": appraisal_urls,
         "bid_rounds": [],  # filled when bid-info API is authorized
         "bid_result": None,
         "gaps": [
             "회차별 유찰가·입찰 참여팀 수: 물건상세 입찰정보 API 활용신청 필요",
             "낙찰/유찰 개찰 상세: 입찰결과상세 API 활용신청 필요",
+            "실제 최신 등기부등본은 인터넷등기소(iros.go.kr)에서 별도 열람",
         ],
+        "iros_url": "https://www.iros.go.kr",
+        "onbid_notice": "온비드 목록은 공고 시점 요약입니다. 입찰 직전 원문·등기를 다시 확인하세요.",
     }
 
 

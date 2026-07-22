@@ -13,7 +13,10 @@ from sqlalchemy.orm import selectinload
 from app.models import AuctionLot, Region
 from app.schemas import (
     InsightScore,
+    LegalInfoRow,
     LegalRiskOut,
+    LegalRowField,
+    ChecklistItem,
     LotDetail,
     LotSummary,
     MarketCompare,
@@ -140,6 +143,166 @@ def to_summary(lot: AuctionLot, region_name: str | None = None) -> LotSummary:
     )
 
 
+def _as_legal_rows(raw_rows: Any, raw_items: Any, kind: str) -> list[LegalInfoRow]:
+    from app.ingest.onbid_detail import _normalize_rows
+
+    if isinstance(raw_rows, list) and raw_rows:
+        out: list[LegalInfoRow] = []
+        for row in raw_rows[:20]:
+            if not isinstance(row, dict):
+                continue
+            fields = [
+                LegalRowField(
+                    key=str(f.get("key") or ""),
+                    label=str(f.get("label") or ""),
+                    value=str(f.get("value") or ""),
+                )
+                for f in (row.get("fields") or [])
+                if isinstance(f, dict)
+            ]
+            out.append(
+                LegalInfoRow(
+                    title=str(row.get("title") or ""),
+                    subtitle=str(row.get("subtitle") or ""),
+                    fields=fields,
+                )
+            )
+        if out:
+            return out
+    if isinstance(raw_items, list) and raw_items:
+        return [
+            LegalInfoRow(
+                title=str(r.get("title") or ""),
+                subtitle=str(r.get("subtitle") or ""),
+                fields=[
+                    LegalRowField(
+                        key=str(f.get("key") or ""),
+                        label=str(f.get("label") or ""),
+                        value=str(f.get("value") or ""),
+                    )
+                    for f in (r.get("fields") or [])
+                    if isinstance(f, dict)
+                ],
+            )
+            for r in _normalize_rows(raw_items[:20], kind)
+        ]
+    return []
+
+
+def _beginner_checklist(lot: AuctionLot, data: dict[str, Any]) -> list[ChecklistItem]:
+    appraisals = data.get("appraisals") or []
+    lease_n = int(data.get("lease_count") or 0)
+    occupy_n = int(data.get("occupy_count") or 0)
+    registry_n = int(data.get("registry_count") or 0)
+    flags = [str(f) for f in (data.get("risk_flags") or [])]
+    risky = any(k in " ".join(flags) for k in ("유치권", "법정지상권", "가처분", "가등기", "분묘"))
+
+    items = [
+        ChecklistItem(
+            id="iros",
+            title="등기부등본 열람 (갑구·을구)",
+            detail="소유권·근저당·가압류·가처분·임차권등기를 인터넷등기소에서 확인하세요. 온비드 목록만으로 최신 등기를 대체할 수 없습니다.",
+            priority=1,
+            status="required",
+            link="https://www.iros.go.kr",
+        ),
+        ChecklistItem(
+            id="onbid",
+            title="온비드 원문 공고·특약 확인",
+            detail="명도책임·부대조건·매수자격·이용현황은 원문 기준으로 최종 확인합니다.",
+            priority=1,
+            status="ready" if lot.source_url else "required",
+            link=lot.source_url or None,
+        ),
+        ChecklistItem(
+            id="appraisal",
+            title="감정평가서 PDF 확인",
+            detail="건물 하자·토지 이용제한·평가 기준일이 가격에 영향을 줍니다.",
+            priority=1,
+            status="ready" if appraisals else "required",
+        ),
+        ChecklistItem(
+            id="lease",
+            title="임대차·대항력·보증금",
+            detail=(
+                f"온비드 임대차 {lease_n}건 표시. "
+                "대항력·확정일자·우선변제는 등기·주민센터·현장으로 교차 확인하세요."
+            ),
+            priority=1,
+            status="warn" if lease_n > 0 else "todo",
+        ),
+        ChecklistItem(
+            id="occupy",
+            title="점유·명도 리스크",
+            detail=(
+                f"점유관계 {occupy_n}건. "
+                f"명도책임: {data.get('eviction_target') or '원문 확인'}."
+            ),
+            priority=1,
+            status="warn" if occupy_n > 0 or data.get("eviction_target") else "todo",
+        ),
+        ChecklistItem(
+            id="registry_list",
+            title="온비드 등기·우선변제 목록",
+            detail=(
+                f"공고에 등기관련 {registry_n}건이 있습니다. "
+                "말소기준권리·인수/말소 판단은 등기부등본 + 전문가 확인이 필요합니다."
+            ),
+            priority=1,
+            status="warn" if registry_n > 0 else "todo",
+        ),
+        ChecklistItem(
+            id="site",
+            title="현장 확인",
+            detail="실사용·불법건축·누수·주차·단지 규칙을 직접 확인하세요.",
+            priority=2,
+            status="todo",
+        ),
+        ChecklistItem(
+            id="price",
+            title="가격 안전마진",
+            detail=(
+                f"유찰 {lot.fail_count}회 · 감정 대비 할인 "
+                f"{(lot.discount_vs_appraisal * 100):.0f}%"
+                if lot.discount_vs_appraisal is not None
+                else f"유찰 {lot.fail_count}회 · 시세·감정가와 최저가를 비교하세요."
+            ),
+            priority=2,
+            status="tip",
+        ),
+    ]
+    if risky:
+        items.insert(
+            0,
+            ChecklistItem(
+                id="redflag",
+                title="고위험 키워드 감지",
+                detail="유치권·법정지상권·가처분 등이 기타사항 텍스트에 언급됩니다. 초보는 보류를 권장합니다.",
+                priority=1,
+                status="warn",
+            ),
+        )
+    return items
+
+
+def _strategy_tips(lot: AuctionLot, data: dict[str, Any]) -> list[str]:
+    tips = [
+        "초보 기본: ‘싸 보인다’보다 ‘인수할 권리가 무엇인가’를 먼저 보세요.",
+        "필수 3종: ①등기부등본 ②감정평가서 ③온비드 원문 특약.",
+        "유찰 횟수만으로 저평가라고 단정하지 마세요. 권리·하자·접근성이 원인일 수 있습니다.",
+    ]
+    if lot.fail_count >= 2:
+        tips.append("유찰 2회+: 왜 안 팔렸는지(권리·명도·입지·가격)를 가설로 적어보고 검증하세요.")
+    if int(data.get("lease_count") or 0) > 0:
+        tips.append("임대차가 있으면 보증금 반환·대항력 여부를 등기와 함께 확인하세요.")
+    if any("유치권" in str(f) or "법정지상권" in str(f) for f in (data.get("risk_flags") or [])):
+        tips.append("유치권·법정지상권 신호가 있으면 초보 단계에서는 패스하는 편이 안전합니다.")
+    if lot.discount_vs_appraisal is not None and lot.discount_vs_appraisal >= 0.3:
+        tips.append("감정가 대비 할인율이 크면 기회일 수도, 함정일 수도 있습니다. 권리 점검 후 입찰가를 정하세요.")
+    tips.append("입찰 전날 등기·공고를 한 번 더 새로고침하고, 자금·명도 비용을 합산한 총원가로 판단하세요.")
+    return tips
+
+
 def _legal_from_lot(lot: AuctionLot) -> LegalRiskOut | None:
     raw = (lot.detail_json or "").strip()
     if not raw or raw == "{}":
@@ -165,6 +328,18 @@ def _legal_from_lot(lot: AuctionLot) -> LegalRiskOut | None:
         bid_rounds=list(data.get("bid_rounds") or []),
         gaps=list(data.get("gaps") or []),
         bid_info_status=data.get("bid_info_status"),
+        lease_rows=_as_legal_rows(data.get("lease_rows"), data.get("leases"), "lease"),
+        occupy_rows=_as_legal_rows(data.get("occupy_rows"), data.get("occupy"), "occupy"),
+        registry_rows=_as_legal_rows(
+            data.get("registry_rows"), data.get("registry"), "registry"
+        ),
+        checklist=_beginner_checklist(lot, data),
+        strategy_tips=_strategy_tips(lot, data),
+        iros_url=str(data.get("iros_url") or "https://www.iros.go.kr"),
+        onbid_notice=str(
+            data.get("onbid_notice")
+            or "온비드 목록은 공고 시점 요약입니다. 입찰 직전 원문·등기를 다시 확인하세요."
+        ),
     )
 
 

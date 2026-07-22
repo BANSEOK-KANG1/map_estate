@@ -52,7 +52,25 @@ class LotDetailScreen extends ConsumerWidget {
             context.go('/');
           },
         ),
-        data: (lot) => _DetailBody(lot: lot),
+        data: (lot) => _DetailBody(
+          lot: lot,
+          onFetchDetail: () async {
+            final api = ref.read(apiProvider);
+            await api.fetchLot(
+              lotId,
+              source: source,
+              externalId: externalId,
+              fetchDetail: true,
+            );
+            ref.invalidate(
+              _lotProvider((
+                id: lotId,
+                source: source,
+                externalId: externalId,
+              )),
+            );
+          },
+        ),
       ),
     );
   }
@@ -62,11 +80,22 @@ typedef _LotKey = ({int id, String? source, String? externalId});
 
 final _lotProvider =
     FutureProvider.autoDispose.family<LotDetail, _LotKey>((ref, key) async {
-  return ref.watch(apiProvider).fetchLot(
-        key.id,
-        source: key.source,
-        externalId: key.externalId,
-      );
+  final api = ref.watch(apiProvider);
+  var lot = await api.fetchLot(
+    key.id,
+    source: key.source,
+    externalId: key.externalId,
+  );
+  // Pull Onbid deep detail (lease/registry/notes) once if missing.
+  if (lot.legal == null && lot.source == 'onbid') {
+    lot = await api.fetchLot(
+      key.id,
+      source: key.source,
+      externalId: key.externalId,
+      fetchDetail: true,
+    );
+  }
+  return lot;
 });
 
 class _DetailError extends StatelessWidget {
@@ -126,9 +155,13 @@ class _DetailError extends StatelessWidget {
 }
 
 class _DetailBody extends StatelessWidget {
-  const _DetailBody({required this.lot});
+  const _DetailBody({
+    required this.lot,
+    required this.onFetchDetail,
+  });
 
   final LotDetail lot;
+  final Future<void> Function() onFetchDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -347,10 +380,88 @@ class _DetailBody extends StatelessWidget {
           }),
 
         const SizedBox(height: 22),
+        _section('초보 체크리스트 · 전략'),
+        if (lot.legal == null)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '권리 상세가 아직 없습니다. 온비드 물건상세를 불러오면 임대차·등기 목록과 체크리스트가 채워집니다.',
+                style: TextStyle(color: AppTheme.ink.withValues(alpha: 0.55)),
+              ),
+              const SizedBox(height: 10),
+              FilledButton.tonal(
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('온비드 권리 상세 불러오는 중…')),
+                  );
+                  try {
+                    await onFetchDetail();
+                  } catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text('실패: $e')));
+                  }
+                },
+                child: const Text('권리·등기 요약 불러오기'),
+              ),
+            ],
+          )
+        else ...[
+          if (lot.legal!.onbidNotice.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                lot.legal!.onbidNotice,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: AppTheme.ink.withValues(alpha: 0.55),
+                ),
+              ),
+            ),
+          ...lot.legal!.checklist.map((c) => _checklistTile(c)),
+          const SizedBox(height: 8),
+          ...lot.legal!.strategyTips.map(
+            (t) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                '→ $t',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: AppTheme.ink.withValues(alpha: 0.72),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await launchUrl(
+                    Uri.parse(lot.legal!.irosUrl),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+                icon: const Icon(Icons.account_balance_outlined, size: 18),
+                label: const Text('등기부등본 (iros)'),
+              ),
+              TextButton(
+                onPressed: () => context.push('/guide'),
+                child: const Text('초보 가이드'),
+              ),
+            ],
+          ),
+        ],
+
+        const SizedBox(height: 22),
         _section('권리 · 법적 리스크 (참고)'),
         if (lot.legal == null)
           Text(
-            '상세 권리 정보 없음 — 설정에서 enrich(detail) 후 다시 확인',
+            '상세 권리 정보 없음',
             style: TextStyle(color: AppTheme.ink.withValues(alpha: 0.55)),
           )
         else ...[
@@ -372,8 +483,23 @@ class _DetailBody extends StatelessWidget {
             ('점유관계', '${lot.legal!.occupyCount}건'),
             ('등기관련', '${lot.legal!.registryCount}건'),
           ]),
+          if (lot.legal!.etcNote.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _noteBlock('기타사항', lot.legal!.etcNote),
+          ],
+          if (lot.legal!.utilizationNote.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _noteBlock('이용현황', lot.legal!.utilizationNote),
+          ],
+          if (lot.legal!.locationNote.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _noteBlock('위치·주변', lot.legal!.locationNote),
+          ],
+          _infoRowList('임대차 목록', lot.legal!.leaseRows),
+          _infoRowList('점유관계 목록', lot.legal!.occupyRows),
+          _infoRowList('등기·우선변제 목록 (온비드)', lot.legal!.registryRows),
           const SizedBox(height: 10),
-          ...lot.legal!.notes.take(8).map(
+          ...lot.legal!.notes.take(6).map(
                 (n) => Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(
@@ -545,6 +671,176 @@ class _DetailBody extends StatelessWidget {
             ),
           )
           .toList(),
+    );
+  }
+
+  Widget _noteBlock(String title, String body) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(
+            body,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: AppTheme.ink.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRowList(String title, List<LegalInfoRow> rows) {
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          ...rows.map((row) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.fog.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    row.title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  if (row.subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      row.subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.ink.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ],
+                  if (row.fields.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ...row.fields.map(
+                      (f) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 88,
+                              child: Text(
+                                f.label,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.ink.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                f.value,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _checklistTile(ChecklistItem c) {
+    final color = switch (c.status) {
+      'warn' => AppTheme.amber,
+      'ready' => const Color(0xFF3D6B4F),
+      'tip' => AppTheme.slate,
+      'required' => const Color(0xFF8B4513),
+      _ => AppTheme.ink,
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                c.status == 'ready'
+                    ? Icons.check_circle_outline
+                    : (c.status == 'warn'
+                        ? Icons.warning_amber_outlined
+                        : Icons.radio_button_unchecked),
+                size: 18,
+                color: color,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  c.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+              if (c.link != null && c.link!.isNotEmpty)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () async {
+                    await launchUrl(
+                      Uri.parse(c.link!),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                ),
+            ],
+          ),
+          if (c.detail.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 26, top: 2),
+              child: Text(
+                c.detail,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: AppTheme.ink.withValues(alpha: 0.65),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

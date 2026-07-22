@@ -340,6 +340,13 @@ class LegalRisk {
   final List<Map<String, dynamic>> bidRounds;
   final List<String> gaps;
   final String? bidInfoStatus;
+  final List<LegalInfoRow> leaseRows;
+  final List<LegalInfoRow> occupyRows;
+  final List<LegalInfoRow> registryRows;
+  final List<ChecklistItem> checklist;
+  final List<String> strategyTips;
+  final String irosUrl;
+  final String onbidNotice;
 
   const LegalRisk({
     this.orgName = '',
@@ -356,6 +363,13 @@ class LegalRisk {
     this.bidRounds = const [],
     this.gaps = const [],
     this.bidInfoStatus,
+    this.leaseRows = const [],
+    this.occupyRows = const [],
+    this.registryRows = const [],
+    this.checklist = const [],
+    this.strategyTips = const [],
+    this.irosUrl = 'https://www.iros.go.kr',
+    this.onbidNotice = '',
   });
 
   factory LegalRisk.fromJson(Map<String, dynamic>? json) {
@@ -379,8 +393,84 @@ class LegalRisk {
           .toList(),
       gaps: (json['gaps'] as List? ?? []).cast<String>(),
       bidInfoStatus: json['bid_info_status'] as String?,
+      leaseRows: (json['lease_rows'] as List? ?? [])
+          .map((e) => LegalInfoRow.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      occupyRows: (json['occupy_rows'] as List? ?? [])
+          .map((e) => LegalInfoRow.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      registryRows: (json['registry_rows'] as List? ?? [])
+          .map((e) => LegalInfoRow.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      checklist: (json['checklist'] as List? ?? [])
+          .map((e) => ChecklistItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      strategyTips: (json['strategy_tips'] as List? ?? []).cast<String>(),
+      irosUrl: json['iros_url'] as String? ?? 'https://www.iros.go.kr',
+      onbidNotice: json['onbid_notice'] as String? ?? '',
     );
   }
+}
+
+class LegalInfoRow {
+  final String title;
+  final String subtitle;
+  final List<LegalRowField> fields;
+
+  const LegalInfoRow({
+    this.title = '',
+    this.subtitle = '',
+    this.fields = const [],
+  });
+
+  factory LegalInfoRow.fromJson(Map<String, dynamic> json) => LegalInfoRow(
+        title: json['title'] as String? ?? '',
+        subtitle: json['subtitle'] as String? ?? '',
+        fields: (json['fields'] as List? ?? [])
+            .map((e) => LegalRowField.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class LegalRowField {
+  final String key;
+  final String label;
+  final String value;
+
+  const LegalRowField({this.key = '', this.label = '', this.value = ''});
+
+  factory LegalRowField.fromJson(Map<String, dynamic> json) => LegalRowField(
+        key: json['key'] as String? ?? '',
+        label: json['label'] as String? ?? '',
+        value: json['value'] as String? ?? '',
+      );
+}
+
+class ChecklistItem {
+  final String id;
+  final String title;
+  final String detail;
+  final int priority;
+  final String status;
+  final String? link;
+
+  const ChecklistItem({
+    required this.id,
+    required this.title,
+    this.detail = '',
+    this.priority = 2,
+    this.status = 'todo',
+    this.link,
+  });
+
+  factory ChecklistItem.fromJson(Map<String, dynamic> json) => ChecklistItem(
+        id: json['id'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        detail: json['detail'] as String? ?? '',
+        priority: json['priority'] as int? ?? 2,
+        status: json['status'] as String? ?? 'todo',
+        link: json['link'] as String?,
+      );
 }
 
 class SearchFilters {
