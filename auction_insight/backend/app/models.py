@@ -158,3 +158,35 @@ class IngestRun(Base):
     lot_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     message: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     finished_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class MarketInsight(Base):
+    """재개발·정비사업 / 개발호재 뉴스 링크."""
+
+    __tablename__ = "market_insights"
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="uq_insight_source_ext"),
+        Index("ix_insight_sido", "sido"),
+        Index("ix_insight_category", "category"),
+        Index("ix_insight_published", "published_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)  # redev_std | news_rss
+    external_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    category: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="재개발정비"
+    )  # 재개발정비 | 개발호재
+    sido: Mapped[str] = mapped_column(String(16), nullable=False, default="")  # 서울|경기|인천
+    sgg: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    title: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    source_url: Mapped[str] = mapped_column(String(1024), nullable=False, default="")
+    publisher: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    data_as_of: Mapped[date | None] = mapped_column(Date, nullable=True)
+    detail_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )

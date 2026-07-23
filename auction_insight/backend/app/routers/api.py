@@ -4,19 +4,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.db import get_db
+from app.ingest.news_rss import ingest_news_rss
 from app.ingest.onbid import ingest_onbid
-from app.models import AuctionLot, AuctionSchedule, NearbyTrade, PoiCache, Region
+from app.ingest.redevelopment import ingest_redevelopment
+from app.models import (
+    AuctionLot,
+    AuctionSchedule,
+    MarketInsight,
+    NearbyTrade,
+    PoiCache,
+    Region,
+)
 from app.schemas import (
     EnrichRequest,
     HealthOut,
     IngestRequest,
     IngestResponse,
+    InsightsResponse,
     LotDetail,
     RegionOut,
     SearchRequest,
     SearchResponse,
 )
 from app.services.enrich import enrich_lot, enrich_lots
+from app.services.insights import list_insights, seed_demo_insights, to_out
 from app.services.lots import (
     get_lot,
     get_lot_by_key,
@@ -112,6 +123,10 @@ async def health(
     except Exception:  # noqa: BLE001
         analysis_meta = {"item_count": 0, "doc_store": {"kind": "unknown"}}
 
+    insight_n = (
+        await db.execute(select(func.count(MarketInsight.id)))
+    ).scalar_one()
+
     return HealthOut(
         status="ok",
         mode=mode,
@@ -119,12 +134,73 @@ async def health(
         onbid_lot_count=onbid_n,
         court_lot_count=court_n,
         demo_lot_count=demo_n,
+        insight_count=insight_n,
         keys={
             "onbid": bool(settings.onbid_service_key),
             "molit": bool(settings.molit_service_key),
             "kakao": bool(settings.kakao_rest_key),
+            "redev": bool(settings.redev_service_key),
         },
         analysis=analysis_meta,
+    )
+
+
+@router.get("/insights", response_model=InsightsResponse)
+async def get_insights(
+    sido: str | None = None,
+    category: str | None = None,
+    q: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+) -> InsightsResponse:
+    total, rows = await list_insights(
+        db, sido=sido, category=category, q=q, limit=limit, offset=offset
+    )
+    return InsightsResponse(total=total, items=[to_out(r) for r in rows])
+
+
+@router.post("/ingest/insights", response_model=IngestResponse)
+async def ingest_insights_endpoint(
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> IngestResponse:
+    """정비사업 OpenAPI + 뉴스 RSS 링크 갱신."""
+    messages: list[str] = []
+    total = 0
+    statuses: list[str] = []
+
+    redev_run = await ingest_redevelopment(db, settings)
+    messages.append(redev_run.message)
+    total += redev_run.lot_count
+    statuses.append(redev_run.status)
+
+    news_run = await ingest_news_rss(db, settings)
+    messages.append(news_run.message)
+    total += news_run.lot_count
+    statuses.append(news_run.status)
+
+    # 키 없고 정비 실패면 데모로 UI 유지
+    if total == 0 and "error" not in statuses:
+        seeded = await seed_demo_insights(db)
+        if seeded:
+            total = seeded
+            messages.append(f"demo insights seeded={seeded}")
+            statuses.append("ok")
+
+    if all(s == "error" for s in statuses):
+        status = "error"
+    elif total == 0:
+        status = "empty"
+    elif "error" in statuses:
+        status = "partial"
+    else:
+        status = "ok"
+
+    return IngestResponse(
+        status=status,
+        lot_count=total,
+        message=" | ".join(m for m in messages if m),
     )
 
 

@@ -73,6 +73,7 @@ async def lifespan(_app: FastAPI):
             asyncio.create_task(_bootstrap_if_empty())
         else:
             asyncio.create_task(_rebalance_geocode_if_needed())
+        asyncio.create_task(_bootstrap_insights_if_empty())
     except Exception:  # noqa: BLE001
         pass
     yield
@@ -205,6 +206,42 @@ async def _bootstrap_if_empty() -> None:
                     logger.info("bootstrap geocode: %s lots", n)
     except Exception:  # noqa: BLE001
         logger.exception("bootstrap failed")
+
+
+async def _bootstrap_insights_if_empty() -> None:
+    """Background: fill MarketInsight when empty (API or demo)."""
+    import logging
+
+    from sqlalchemy import func, select
+
+    from app.db import SessionLocal
+    from app.ingest.news_rss import ingest_news_rss
+    from app.ingest.redevelopment import ingest_redevelopment
+    from app.models import MarketInsight
+    from app.services.insights import seed_demo_insights
+
+    logger = logging.getLogger(__name__)
+    settings = get_settings()
+    try:
+        async with SessionLocal() as session:
+            total = (
+                await session.execute(select(func.count(MarketInsight.id)))
+            ).scalar_one()
+            if total > 0:
+                return
+            redev = await ingest_redevelopment(session, settings)
+            news = await ingest_news_rss(session, settings)
+            count = redev.lot_count + news.lot_count
+            if count == 0:
+                count = await seed_demo_insights(session)
+            logger.info(
+                "bootstrap insights: %s (%s | %s)",
+                count,
+                redev.message[:80],
+                news.message[:80],
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("bootstrap insights failed")
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

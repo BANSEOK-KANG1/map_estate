@@ -99,9 +99,10 @@ bash auction_insight/backend/scripts/ingest_real.sh
 
 ## 주요 화면
 
-- 홈: 경매/공매 필터 + 지도 + 목록
+- 홈: 실거래 | 법원 | 온비드 | **호재** + 지역 필터 + 지도/목록(또는 인사이트 목록)
+- 호재: 재개발·정비사업(공공) + 개발호재 뉴스 링크 (본문 미수집)
 - 상세: 감정가·최저가·시세 비교, 유찰 이력, 상권, 원문 링크
-- 설정: API Base URL
+- 설정: API Base URL · 호재 인사이트 갱신
 
 ## API 요약
 
@@ -111,5 +112,7 @@ bash auction_insight/backend/scripts/ingest_real.sh
 | GET | `/api/regions` | 서울·경기·인천 시군구 |
 | POST | `/api/search` | 조건 검색 |
 | GET | `/api/lots/{id}` | 물건 상세 |
+| GET | `/api/insights` | 호재 인사이트 목록 |
+| POST | `/api/ingest/insights` | 정비사업·뉴스 링크 갱신 |
 | POST | `/api/ingest/onbid` | 온비드 수집 |
 | POST | `/api/demo/seed` | 데모 시드 |

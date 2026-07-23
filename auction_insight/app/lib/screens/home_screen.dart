@@ -6,6 +6,7 @@ import 'package:auction_insight_app/models/models.dart';
 import 'package:auction_insight_app/providers/providers.dart';
 import 'package:auction_insight_app/screens/filter_sheet.dart';
 import 'package:auction_insight_app/theme.dart';
+import 'package:auction_insight_app/widgets/insights_panel.dart';
 import 'package:auction_insight_app/widgets/lot_list_tile.dart';
 import 'package:auction_insight_app/widgets/lot_map.dart';
 import 'package:auction_insight_app/widgets/region_quick_bar.dart';
@@ -16,6 +17,13 @@ class HomeScreen extends ConsumerWidget {
 
   static const _desktopBreakpoint = 800.0;
   static const _listPanelWidth = 420.0;
+
+  static const _modeOptions = <(String, String)>[
+    ('real', '실거래'),
+    ('court', '법원'),
+    ('onbid', '온비드'),
+    ('insight', '호재'),
+  ];
 
   void _openLot(BuildContext context, LotSummary lot) {
     context.push(
@@ -30,6 +38,9 @@ class HomeScreen extends ConsumerWidget {
       return;
     }
     ref.read(homeModeProvider.notifier).state = key;
+    if (key == 'insight') {
+      return;
+    }
     final cur = ref.read(filtersProvider);
     ref.read(filtersProvider.notifier).state = cur.copyWith(
       sources: key == 'court' ? ['court'] : ['onbid'],
@@ -46,6 +57,7 @@ class HomeScreen extends ConsumerWidget {
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = width >= _desktopBreakpoint;
     final homeMode = ref.watch(homeModeProvider);
+    final isInsight = homeMode == 'insight';
 
     final extraFilters = <Widget>[
       for (final u in filters.usages)
@@ -55,7 +67,7 @@ class HomeScreen extends ConsumerWidget {
     ];
 
     return Scaffold(
-      floatingActionButton: homeMode == 'real'
+      floatingActionButton: (homeMode == 'real' || isInsight)
           ? null
           : FloatingActionButton.extended(
               onPressed: () => context.push('/analysis/new?source=$homeMode'),
@@ -93,16 +105,17 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    IconButton(
-                      tooltip: '필터',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => showFilterSheet(context, ref),
-                      icon: Badge(
-                        isLabelVisible: extraFilters.isNotEmpty,
-                        smallSize: 8,
-                        child: const Icon(Icons.tune, size: 22),
+                    if (!isInsight)
+                      IconButton(
+                        tooltip: '필터',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => showFilterSheet(context, ref),
+                        icon: Badge(
+                          isLabelVisible: extraFilters.isNotEmpty,
+                          smallSize: 8,
+                          child: const Icon(Icons.tune, size: 22),
+                        ),
                       ),
-                    ),
                     IconButton(
                       tooltip: '초보 가이드',
                       visualDensity: VisualDensity.compact,
@@ -128,11 +141,7 @@ class HomeScreen extends ConsumerWidget {
                         children: [
                           SegmentPills(
                             selectedKey: homeMode,
-                            options: const [
-                              ('real', '실거래'),
-                              ('court', '법원'),
-                              ('onbid', '온비드'),
-                            ],
+                            options: _modeOptions,
                             onSelected: (k) => _setHomeMode(ref, k),
                           ),
                           Container(
@@ -149,25 +158,20 @@ class HomeScreen extends ConsumerWidget {
                     else ...[
                       SegmentPills(
                         selectedKey: homeMode,
-                        options: const [
-                          ('real', '실거래'),
-                          ('court', '법원'),
-                          ('onbid', '온비드'),
-                        ],
+                        options: _modeOptions,
                         onSelected: (k) => _setHomeMode(ref, k),
                       ),
                       const SizedBox(height: 8),
                       const RegionQuickBar(sidoOnly: true),
                     ],
-                    // District chips only when a sido is active
-                    if (activeSido != null) ...[
+                    if (!isInsight && activeSido != null) ...[
                       const SizedBox(height: 8),
                       const RegionDistrictBar(),
                     ],
                   ],
                 ),
               ),
-              if (extraFilters.isNotEmpty)
+              if (!isInsight && extraFilters.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   child: Wrap(
@@ -178,158 +182,178 @@ class HomeScreen extends ConsumerWidget {
                 ),
               const SizedBox(height: 10),
               Expanded(
-                child: search.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('불러오기 실패\n$e', textAlign: TextAlign.center),
-                          const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: () => ref.invalidate(searchProvider),
-                            child: const Text('다시 시도'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  data: (result) {
-                    final map = LotMap(
-                      items: result.items,
-                      height: isDesktop ? 320 : 300,
-                      expand: isDesktop,
-                      sidoPreset: activeSido,
-                      onTapLot: (lot) => _openLot(context, lot),
-                    );
-
-                    final listHeader = Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        isDesktop ? 14 : 16,
-                        isDesktop ? 10 : 8,
-                        isDesktop ? 14 : 16,
-                        6,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                '${result.total}건',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
+                child: isInsight
+                    ? Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          isDesktop ? 12 : 0,
+                          0,
+                          isDesktop ? 12 : 0,
+                          isDesktop ? 12 : 0,
+                        ),
+                        child: InsightsPanel(isDesktop: isDesktop),
+                      )
+                    : search.when(
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (e, _) => Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '불러오기 실패\n$e',
+                                  textAlign: TextAlign.center,
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  summary,
-                                  textAlign: TextAlign.right,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.ink.withValues(alpha: 0.45),
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                                const SizedBox(height: 12),
+                                FilledButton(
+                                  onPressed: () =>
+                                      ref.invalidate(searchProvider),
+                                  child: const Text('다시 시도'),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          SegmentPills(
-                            dense: true,
-                            selectedKey: filters.sort,
-                            options: const [
-                              ('score', '추천순'),
-                              ('deadline', '마감임박'),
-                              ('discount', '할인율'),
-                            ],
-                            onSelected: (key) {
-                              ref.read(filtersProvider.notifier).state =
-                                  filters.copyWith(sort: key);
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-
-                    final list = ListView.separated(
-                      padding: EdgeInsets.fromLTRB(
-                        isDesktop ? 12 : 16,
-                        0,
-                        isDesktop ? 12 : 16,
-                        24,
-                      ),
-                      itemCount: result.items.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (context, i) {
-                        final lot = result.items[i];
-                        return LotListTile(
-                          lot: lot,
-                          onTap: () => _openLot(context, lot),
-                        );
-                      },
-                    );
-
-                    if (isDesktop) {
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: AppTheme.line),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: map,
-                                ),
-                              ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            SizedBox(
-                              width: _listPanelWidth,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.55),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: AppTheme.line),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
+                          ),
+                        ),
+                        data: (result) {
+                          final map = LotMap(
+                            items: result.items,
+                            height: isDesktop ? 320 : 300,
+                            expand: isDesktop,
+                            sidoPreset: activeSido,
+                            onTapLot: (lot) => _openLot(context, lot),
+                          );
+
+                          final listHeader = Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              isDesktop ? 14 : 16,
+                              isDesktop ? 10 : 8,
+                              isDesktop ? 14 : 16,
+                              6,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
                                   children: [
-                                    listHeader,
-                                    Expanded(child: list),
+                                    Text(
+                                      '${result.total}건',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        summary,
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.ink
+                                              .withValues(alpha: 0.45),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                   ],
                                 ),
-                              ),
+                                const SizedBox(height: 8),
+                                SegmentPills(
+                                  dense: true,
+                                  selectedKey: filters.sort,
+                                  options: const [
+                                    ('score', '추천순'),
+                                    ('deadline', '마감임박'),
+                                    ('discount', '할인율'),
+                                  ],
+                                  onSelected: (key) {
+                                    ref.read(filtersProvider.notifier).state =
+                                        filters.copyWith(sort: key);
+                                  },
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      );
-                    }
+                          );
 
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: map,
-                        ),
-                        listHeader,
-                        Expanded(child: list),
-                      ],
-                    );
-                  },
-                ),
+                          final list = ListView.separated(
+                            padding: EdgeInsets.fromLTRB(
+                              isDesktop ? 12 : 16,
+                              0,
+                              isDesktop ? 12 : 16,
+                              24,
+                            ),
+                            itemCount: result.items.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1),
+                            itemBuilder: (context, i) {
+                              final lot = result.items[i];
+                              return LotListTile(
+                                lot: lot,
+                                onTap: () => _openLot(context, lot),
+                              );
+                            },
+                          );
+
+                          if (isDesktop) {
+                            return Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(14),
+                                        border:
+                                            Border.all(color: AppTheme.line),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: map,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    width: _listPanelWidth,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.55),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border:
+                                            Border.all(color: AppTheme.line),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          listHeader,
+                                          Expanded(child: list),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return Column(
+                            children: [
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: map,
+                              ),
+                              listHeader,
+                              Expanded(child: list),
+                            ],
+                          );
+                        },
+                      ),
               ),
             ],
           ),

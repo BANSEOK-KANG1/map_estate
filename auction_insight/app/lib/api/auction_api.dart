@@ -131,6 +131,38 @@ class AuctionApi {
     return Map<String, dynamic>.from(res.data as Map);
   }
 
+  Future<InsightsResult> fetchInsights({
+    String? sido,
+    String? category,
+    String? q,
+    int limit = 100,
+  }) async {
+    final res = await _dio.get(
+      '/api/insights',
+      queryParameters: {
+        if (sido != null && sido.isNotEmpty) 'sido': sido,
+        if (category != null &&
+            category.isNotEmpty &&
+            category != '전체')
+          'category': category,
+        if (q != null && q.isNotEmpty) 'q': q,
+        'limit': limit,
+      },
+    );
+    final data = res.data as Map<String, dynamic>;
+    return InsightsResult(
+      total: data['total'] as int? ?? 0,
+      items: (data['items'] as List? ?? [])
+          .map((e) => MarketInsightItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  Future<Map<String, dynamic>> ingestInsights() async {
+    final res = await _dio.post('/api/ingest/insights');
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
   Future<Map<String, dynamic>> enrichLots({
     int limit = 50,
     bool fetchMarket = true,

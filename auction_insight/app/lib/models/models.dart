@@ -558,6 +558,61 @@ class SearchResult {
   const SearchResult({required this.total, required this.items});
 }
 
+class MarketInsightItem {
+  final int id;
+  final String source;
+  final String sourceLabel;
+  final String category;
+  final String sido;
+  final String sgg;
+  final String title;
+  final String summary;
+  final String sourceUrl;
+  final String publisher;
+  final DateTime? publishedAt;
+  final DateTime? dataAsOf;
+
+  const MarketInsightItem({
+    required this.id,
+    required this.source,
+    required this.sourceLabel,
+    required this.category,
+    required this.sido,
+    required this.sgg,
+    required this.title,
+    required this.summary,
+    required this.sourceUrl,
+    required this.publisher,
+    this.publishedAt,
+    this.dataAsOf,
+  });
+
+  factory MarketInsightItem.fromJson(Map<String, dynamic> json) =>
+      MarketInsightItem(
+        id: json['id'] as int,
+        source: json['source'] as String? ?? '',
+        sourceLabel: json['source_label'] as String? ?? '',
+        category: json['category'] as String? ?? '',
+        sido: json['sido'] as String? ?? '',
+        sgg: json['sgg'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        summary: json['summary'] as String? ?? '',
+        sourceUrl: json['source_url'] as String? ?? '',
+        publisher: json['publisher'] as String? ?? '',
+        publishedAt: _parseDt(json['published_at']),
+        dataAsOf: _parseDt(json['data_as_of']),
+      );
+
+  DateTime? get sortDate => publishedAt ?? dataAsOf;
+}
+
+class InsightsResult {
+  final int total;
+  final List<MarketInsightItem> items;
+
+  const InsightsResult({required this.total, required this.items});
+}
+
 DateTime? _parseDt(dynamic v) {
   if (v == null) return null;
   if (v is String && v.isNotEmpty) {

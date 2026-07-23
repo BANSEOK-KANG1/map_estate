@@ -14,6 +14,7 @@ from app.db import Base, SessionLocal, engine
 from app.models import AuctionLot, AuctionSchedule, PoiCache
 from app.schemas import IngestResponse
 from app.services.enrich import enrich_lots
+from app.services.insights import seed_demo_insights
 from app.services.lots import match_region_code, seed_regions
 from app.services.score import apply_lot_scores
 
@@ -132,11 +133,15 @@ async def seed_demo(
             await _upsert_from_catalog(session, raw)
             count += 1
         await session.commit()
+        insight_n = await seed_demo_insights(session)
         if enrich:
             lots = (await session.execute(select(AuctionLot))).scalars().all()
             await enrich_lots(session, settings, list(lots))
         return IngestResponse(
             status="ok",
             lot_count=count,
-            message=f"demo seed complete ({count} lots, reset={reset})",
+            message=(
+                f"demo seed complete ({count} lots, {insight_n} insights, "
+                f"reset={reset})"
+            ),
         )

@@ -202,6 +202,27 @@ class HealthOut(BaseModel):
     onbid_lot_count: int = 0
     court_lot_count: int = 0
     demo_lot_count: int = 0
+    insight_count: int = 0
     keys: dict[str, bool] = Field(default_factory=dict)
     onbid_reachable: bool | None = None
     analysis: dict = Field(default_factory=dict)
+
+
+class MarketInsightOut(BaseModel):
+    id: int
+    source: str
+    source_label: str
+    category: str
+    sido: str
+    sgg: str = ""
+    title: str
+    summary: str = ""
+    source_url: str
+    publisher: str = ""
+    published_at: datetime | None = None
+    data_as_of: date | None = None
+
+
+class InsightsResponse(BaseModel):
+    total: int
+    items: list[MarketInsightOut]
