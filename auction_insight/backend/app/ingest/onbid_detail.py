@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
@@ -284,11 +286,13 @@ def build_legal_summary(item: dict[str, Any]) -> dict[str, Any]:
         "bid_rounds": [],  # filled when bid-info API is authorized
         "bid_result": None,
         "gaps": [
-            "회차별 유찰가·입찰 참여팀 수: 물건상세 입찰정보 API 활용신청 필요",
-            "낙찰/유찰 개찰 상세: 입찰결과상세 API 활용신청 필요",
-            "실제 최신 등기부등본은 인터넷등기소(iros.go.kr)에서 별도 열람",
+            "회차별 유찰가·입찰 참여팀 수: 물건상세 입찰정보 API 활용신청 필요 (원문 HTML로 보완 시도)",
+            "실제 최신 등기부등본은 인터넷등기소에서 주소로 검색해 열람 (앱이 주소를 복사해 둠)",
         ],
         "iros_url": "https://www.iros.go.kr",
+        "iros_address": "",
+        "bid_history_summary": "",
+        "bid_history_notes": [],
         "onbid_notice": "온비드 목록은 공고 시점 요약입니다. 입찰 직전 원문·등기를 다시 확인하세요.",
     }
 
@@ -407,11 +411,71 @@ async def enrich_lot_onbid_detail(
     rounds, err = await try_fetch_bid_rounds(settings, cltr, pbct)
     if rounds:
         legal["bid_rounds"] = rounds
-        legal["gaps"] = [g for g in legal["gaps"] if "입찰정보" not in g]
-    elif err == "forbidden":
-        legal["bid_info_status"] = "forbidden"
+        legal["gaps"] = [g for g in legal["gaps"] if "입찰정보" not in g and "HTML" not in g]
     else:
         legal["bid_info_status"] = err or "empty"
+        # Fallback: scrape 이전 입찰내역 from Onbid detail HTML (public page).
+        try:
+            from app.ingest.onbid_html import fetch_onbid_html, parse_bid_history_html
+            from app.models import AuctionSchedule
+
+            html = await fetch_onbid_html(lot.source_url or "")
+            hist = parse_bid_history_html(html)
+            if hist.get("rounds"):
+                legal["bid_rounds"] = hist["rounds"]
+                legal["bid_history_summary"] = hist.get("summary") or ""
+                legal["bid_history_notes"] = hist.get("notes") or []
+                legal["bid_info_status"] = "onbid_html"
+                legal["gaps"] = [
+                    g
+                    for g in legal.get("gaps") or []
+                    if "입찰정보" not in g and "HTML" not in g
+                ]
+                # Persist timeline into schedules for list/detail fallback
+                for i, r in enumerate(hist["rounds"][:40], start=1):
+                    label = str(r.get("round_label") or "")
+                    # Prefer leading number from "018/001"
+                    round_no = i
+                    m = re.match(r"(\d+)", label.replace(" ", ""))
+                    if m:
+                        try:
+                            round_no = int(m.group(1))
+                        except ValueError:
+                            round_no = i
+                    existing = await session.execute(
+                        select(AuctionSchedule).where(
+                            AuctionSchedule.lot_id == lot.id,
+                            AuctionSchedule.round_no == round_no,
+                        )
+                    )
+                    sched = existing.scalar_one_or_none()
+                    if sched is None:
+                        sched = AuctionSchedule(lot_id=lot.id, round_no=round_no)
+                        session.add(sched)
+                    open_at = str(r.get("open_at") or "")
+                    if open_at:
+                        try:
+                            from datetime import datetime as dt
+
+                            sched.sale_date = dt.strptime(
+                                open_at[:10], "%Y-%m-%d"
+                            ).date()
+                        except ValueError:
+                            pass
+                    if r.get("planned_manwon") is not None:
+                        sched.min_bid_manwon = int(r["planned_manwon"])
+                    sched.result = str(r.get("result") or "")[:32]
+                    note_bits = [
+                        label and f"회차 {label}",
+                        r.get("win_price_text") and f"낙찰 {r['win_price_text']}",
+                        open_at and f"개찰 {open_at}",
+                    ]
+                    sched.note = " · ".join(b for b in note_bits if b)[:240]
+        except Exception:  # noqa: BLE001
+            logger.exception("onbid html bid history failed for lot %s", lot.id)
+
+    legal["iros_address"] = lot.address or lot.title or ""
+    legal["iros_url"] = "https://www.iros.go.kr"
 
     # Update fail count / description from authoritative detail
     if legal.get("fail_count") is not None:

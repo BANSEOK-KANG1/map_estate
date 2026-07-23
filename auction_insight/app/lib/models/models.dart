@@ -354,6 +354,9 @@ class LegalRisk {
   final List<ChecklistItem> checklist;
   final List<String> strategyTips;
   final String irosUrl;
+  final String irosAddress;
+  final String bidHistorySummary;
+  final List<String> bidHistoryNotes;
   final String onbidNotice;
 
   const LegalRisk({
@@ -377,6 +380,9 @@ class LegalRisk {
     this.checklist = const [],
     this.strategyTips = const [],
     this.irosUrl = 'https://www.iros.go.kr',
+    this.irosAddress = '',
+    this.bidHistorySummary = '',
+    this.bidHistoryNotes = const [],
     this.onbidNotice = '',
   });
 
@@ -415,6 +421,10 @@ class LegalRisk {
           .toList(),
       strategyTips: (json['strategy_tips'] as List? ?? []).cast<String>(),
       irosUrl: json['iros_url'] as String? ?? 'https://www.iros.go.kr',
+      irosAddress: json['iros_address'] as String? ?? '',
+      bidHistorySummary: json['bid_history_summary'] as String? ?? '',
+      bidHistoryNotes:
+          (json['bid_history_notes'] as List? ?? []).cast<String>(),
       onbidNotice: json['onbid_notice'] as String? ?? '',
     );
   }

@@ -86,6 +86,9 @@ class LegalRiskOut(BaseModel):
     checklist: list[ChecklistItem] = Field(default_factory=list)
     strategy_tips: list[str] = Field(default_factory=list)
     iros_url: str = "https://www.iros.go.kr"
+    iros_address: str = ""
+    bid_history_summary: str = ""
+    bid_history_notes: list[str] = Field(default_factory=list)
     onbid_notice: str = ""
 
 

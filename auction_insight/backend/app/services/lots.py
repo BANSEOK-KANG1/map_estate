@@ -237,7 +237,12 @@ def _beginner_checklist(lot: AuctionLot, data: dict[str, Any]) -> list[Checklist
         ChecklistItem(
             id="iros",
             title="등기부등본 열람 (갑구·을구)",
-            detail="소유권·근저당·가압류·가처분·임차권등기를 인터넷등기소에서 확인하세요. 온비드 목록만으로 최신 등기를 대체할 수 없습니다.",
+            detail=(
+                f"검색 주소: {lot.address or lot.title}. "
+                "버튼을 누르면 주소가 복사되고 인터넷등기소가 열립니다. "
+                "부동산등기 → 열람하기 → 지번/도로명으로 이 주소를 검색하세요. "
+                "온비드·목록만으로 최신 등기를 대체할 수 없습니다."
+            ),
             priority=1,
             status="required",
             link="https://www.iros.go.kr",
@@ -372,6 +377,9 @@ def _legal_from_lot(lot: AuctionLot) -> LegalRiskOut | None:
         checklist=_beginner_checklist(lot, data),
         strategy_tips=_strategy_tips(lot, data),
         iros_url=str(data.get("iros_url") or "https://www.iros.go.kr"),
+        iros_address=str(data.get("iros_address") or lot.address or ""),
+        bid_history_summary=str(data.get("bid_history_summary") or ""),
+        bid_history_notes=[str(x) for x in (data.get("bid_history_notes") or [])],
         onbid_notice=str(
             data.get("onbid_notice")
             or "온비드 목록은 공고 시점 요약입니다. 입찰 직전 원문·등기를 다시 확인하세요."

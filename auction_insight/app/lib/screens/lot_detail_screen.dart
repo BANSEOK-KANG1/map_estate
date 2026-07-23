@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -331,9 +332,26 @@ class _DetailBodyState extends State<_DetailBody> {
             children: [
               OutlinedButton.icon(
                 onPressed: () async {
+                  final addr = (lot.legal?.irosAddress.isNotEmpty == true)
+                      ? lot.legal!.irosAddress
+                      : (lot.address.isNotEmpty ? lot.address : lot.title);
+                  if (addr.isNotEmpty) {
+                    await Clipboard.setData(ClipboardData(text: addr));
+                  }
                   await launchUrl(
                     Uri.parse(lot.legal!.irosUrl),
                     mode: LaunchMode.externalApplication,
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        addr.isEmpty
+                            ? '인터넷등기소가 열렸습니다. 부동산등기 → 열람하기에서 주소를 검색하세요.'
+                            : '주소 복사됨: $addr\n인터넷등기소 → 부동산등기 → 열람하기 → 지번/도로명 검색',
+                      ),
+                      duration: const Duration(seconds: 5),
+                    ),
                   );
                 },
                 icon: const Icon(Icons.account_balance_outlined, size: 18),
@@ -469,26 +487,113 @@ class _DetailBodyState extends State<_DetailBody> {
         const SizedBox(height: 22),
         _section('입찰 · 유찰 이력'),
         Text(
-          '유찰 ${lot.failCount}회'
-          '${lot.legal?.bidRounds.isNotEmpty == true ? " · 회차 상세 있음" : " · 회차별 최저가·입찰팀 수는 별도 API 신청 후 표시"}',
+          lot.legal?.bidHistorySummary.isNotEmpty == true
+              ? lot.legal!.bidHistorySummary
+              : '유찰 ${lot.failCount}회'
+                  '${lot.legal?.bidRounds.isNotEmpty == true ? " · 회차 ${lot.legal!.bidRounds.length}건" : ""}',
           style: TextStyle(
             fontSize: 13,
-            color: AppTheme.ink.withValues(alpha: 0.65),
+            fontWeight: FontWeight.w600,
+            color: AppTheme.ink.withValues(alpha: 0.75),
           ),
         ),
+        if (lot.legal?.bidHistoryNotes.isNotEmpty == true) ...[
+          const SizedBox(height: 8),
+          ...lot.legal!.bidHistoryNotes.map(
+            (n) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                '· $n',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AppTheme.ink.withValues(alpha: 0.62),
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         if (lot.legal?.bidRounds.isNotEmpty == true)
-          ...lot.legal!.bidRounds.map((r) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                '${r['round_no'] ?? "-"}회 · 최저 ${r['min_bid'] ?? "-"} · 입찰 ${r['bidder_count'] ?? "?"}팀 · ${r['result'] ?? ""}',
-                style: const TextStyle(fontSize: 13),
+          ...lot.legal!.bidRounds.take(24).map((r) {
+            final result = '${r['result'] ?? ''}'.trim();
+            final label = '${r['round_label'] ?? r['round_no'] ?? '-'}';
+            final planned =
+                '${r['planned_price_text'] ?? r['min_bid'] ?? '-'}';
+            final win = '${r['win_price_text'] ?? ''}'.trim();
+            final when = '${r['open_at'] ?? ''}'.trim();
+            final Color accent;
+            if (result.contains('낙찰')) {
+              accent = AppTheme.slate;
+            } else if (result.contains('취소')) {
+              accent = AppTheme.amber;
+            } else {
+              accent = AppTheme.ink.withValues(alpha: 0.45);
+            }
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.line),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      result.isEmpty ? '회차' : result,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: accent,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '회차 $label'
+                          '${when.isNotEmpty ? ' · $when' : ''}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '예정가 $planned'
+                          '${win.isNotEmpty ? ' · 낙찰 $win' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.ink.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           })
         else if (lot.schedules.isEmpty)
-          Text('마감 ${formatDate(lot.bidEndAt)}')
+          Text(
+            '마감 ${formatDate(lot.bidEndAt)} · 상세 이력은 «권리·등기 요약 불러오기» 후 표시됩니다.',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppTheme.ink.withValues(alpha: 0.55),
+            ),
+          )
         else
           ...lot.schedules.map((s) {
             final active = s.result == '진행';
@@ -508,7 +613,8 @@ class _DetailBodyState extends State<_DetailBody> {
                     radius: 14,
                     backgroundColor: active ? AppTheme.slate : AppTheme.fog,
                     foregroundColor: active ? Colors.white : AppTheme.ink,
-                    child: Text('${s.roundNo}', style: const TextStyle(fontSize: 12)),
+                    child:
+                        Text('${s.roundNo}', style: const TextStyle(fontSize: 12)),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -520,7 +626,8 @@ class _DetailBodyState extends State<_DetailBody> {
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         Text(
-                          '${formatDate(s.saleDate)} · 최저 ${formatManwon(s.minBidManwon)}',
+                          '${formatDate(s.saleDate)} · 최저 ${formatManwon(s.minBidManwon)}'
+                          '${s.note.isNotEmpty ? ' · ${s.note}' : ''}',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppTheme.ink.withValues(alpha: 0.55),
@@ -533,6 +640,19 @@ class _DetailBodyState extends State<_DetailBody> {
               ),
             );
           }),
+        if (lot.sourceUrl.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: () async {
+              await launchUrl(
+                Uri.parse(lot.sourceUrl),
+                mode: LaunchMode.externalApplication,
+              );
+            },
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('온비드에서 이전 입찰내역 원문 보기'),
+          ),
+        ],
 
         const SizedBox(height: 22),
         _section('전략 팁 · 권리 상세'),
@@ -936,6 +1056,14 @@ class _DetailBodyState extends State<_DetailBody> {
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   onPressed: () async {
+                    if (c.id == 'iros') {
+                      final addr = (lot.legal?.irosAddress.isNotEmpty == true)
+                          ? lot.legal!.irosAddress
+                          : (lot.address.isNotEmpty ? lot.address : lot.title);
+                      if (addr.isNotEmpty) {
+                        await Clipboard.setData(ClipboardData(text: addr));
+                      }
+                    }
                     await launchUrl(
                       Uri.parse(c.link!),
                       mode: LaunchMode.externalApplication,
