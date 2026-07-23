@@ -95,8 +95,12 @@ final _lotProvider =
     source: key.source,
     externalId: key.externalId,
   );
-  // Pull Onbid deep detail (lease/registry/notes) once if missing.
-  if (lot.legal == null && lot.source == 'onbid') {
+  // Onbid: pull deep detail when missing, or when bid history / iros address absent.
+  final needsDetail = lot.source == 'onbid' &&
+      (lot.legal == null ||
+          lot.legal!.bidRounds.isEmpty ||
+          lot.legal!.irosAddress.isEmpty);
+  if (needsDetail) {
     lot = await api.fetchLot(
       key.id,
       source: key.source,
@@ -331,29 +335,7 @@ class _DetailBodyState extends State<_DetailBody> {
             runSpacing: 8,
             children: [
               OutlinedButton.icon(
-                onPressed: () async {
-                  final addr = (lot.legal?.irosAddress.isNotEmpty == true)
-                      ? lot.legal!.irosAddress
-                      : (lot.address.isNotEmpty ? lot.address : lot.title);
-                  if (addr.isNotEmpty) {
-                    await Clipboard.setData(ClipboardData(text: addr));
-                  }
-                  await launchUrl(
-                    Uri.parse(lot.legal!.irosUrl),
-                    mode: LaunchMode.externalApplication,
-                  );
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        addr.isEmpty
-                            ? '인터넷등기소가 열렸습니다. 부동산등기 → 열람하기에서 주소를 검색하세요.'
-                            : '주소 복사됨: $addr\n인터넷등기소 → 부동산등기 → 열람하기 → 지번/도로명 검색',
-                      ),
-                      duration: const Duration(seconds: 5),
-                    ),
-                  );
-                },
+                onPressed: () => _openIros(context, lot),
                 icon: const Icon(Icons.account_balance_outlined, size: 18),
                 label: const Text('등기부등본'),
               ),
@@ -857,6 +839,145 @@ class _DetailBodyState extends State<_DetailBody> {
         ),
       );
 
+  Future<void> _openIros(BuildContext context, LotDetail lot) async {
+    final addr = (lot.legal?.irosAddress.isNotEmpty == true)
+        ? lot.legal!.irosAddress
+        : (lot.address.isNotEmpty ? lot.address : lot.title);
+    final iros = lot.legal?.irosUrl.isNotEmpty == true
+        ? lot.legal!.irosUrl
+        : 'https://www.iros.go.kr';
+
+    if (addr.isNotEmpty) {
+      await Clipboard.setData(ClipboardData(text: addr));
+    }
+
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            8,
+            20,
+            20 + MediaQuery.paddingOf(ctx).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                '등기부등본 열람',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '인터넷등기소는 물건 직링크를 제공하지 않습니다. '
+                '아래 주소를 복사한 뒤 등기소에서 검색하세요.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: AppTheme.ink.withValues(alpha: 0.65),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.slate.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '이 물건 주소',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.ink.withValues(alpha: 0.55),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      addr.isEmpty ? '(주소 없음)' : addr,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        height: 1.35,
+                      ),
+                    ),
+                    if (addr.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '클립보드에 복사됨',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.slate.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '1. 인터넷등기소 열기\n'
+                '2. 부동산등기 → 열람하기\n'
+                '3. 지번/도로명에 위 주소 붙여넣기',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: AppTheme.ink.withValues(alpha: 0.72),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: addr.isEmpty
+                          ? null
+                          : () async {
+                              await Clipboard.setData(
+                                ClipboardData(text: addr),
+                              );
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(content: Text('주소 다시 복사됨')),
+                                );
+                              }
+                            },
+                      icon: const Icon(Icons.copy, size: 18),
+                      label: const Text('주소 복사'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await launchUrl(
+                          Uri.parse(iros),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      label: const Text('등기소 열기'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   String _checklistDoneHint(List<ChecklistItem> items) {
     final ready = items.where((e) => e.status == 'ready').length;
     final warn = items.where((e) => e.status == 'warn').length;
@@ -1057,12 +1178,8 @@ class _DetailBodyState extends State<_DetailBody> {
                   visualDensity: VisualDensity.compact,
                   onPressed: () async {
                     if (c.id == 'iros') {
-                      final addr = (lot.legal?.irosAddress.isNotEmpty == true)
-                          ? lot.legal!.irosAddress
-                          : (lot.address.isNotEmpty ? lot.address : lot.title);
-                      if (addr.isNotEmpty) {
-                        await Clipboard.setData(ClipboardData(text: addr));
-                      }
+                      await _openIros(context, lot);
+                      return;
                     }
                     await launchUrl(
                       Uri.parse(c.link!),
