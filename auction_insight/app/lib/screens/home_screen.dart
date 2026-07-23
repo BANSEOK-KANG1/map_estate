@@ -9,6 +9,7 @@ import 'package:auction_insight_app/theme.dart';
 import 'package:auction_insight_app/widgets/lot_list_tile.dart';
 import 'package:auction_insight_app/widgets/lot_map.dart';
 import 'package:auction_insight_app/widgets/region_quick_bar.dart';
+import 'package:auction_insight_app/widgets/segment_pills.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,19 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _setHomeMode(WidgetRef ref, String key) async {
+    if (key == 'real') {
+      final uri = Uri.parse('https://map-estate-uz70.onrender.com');
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    ref.read(homeModeProvider.notifier).state = key;
+    final cur = ref.read(filtersProvider);
+    ref.read(filtersProvider.notifier).state = cur.copyWith(
+      sources: key == 'court' ? ['court'] : ['onbid'],
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final search = ref.watch(searchProvider);
@@ -31,8 +45,14 @@ class HomeScreen extends ConsumerWidget {
     final summary = regionSummaryLabel(regions, filters.regionCodes);
     final width = MediaQuery.sizeOf(context).width;
     final isDesktop = width >= _desktopBreakpoint;
-
     final homeMode = ref.watch(homeModeProvider);
+
+    final extraFilters = <Widget>[
+      for (final u in filters.usages)
+        _ActiveFilterChip(label: usageChipLabel(u)),
+      if (filters.minFailCount != null)
+        _ActiveFilterChip(label: '유찰 ${filters.minFailCount}+'),
+    ];
 
     return Scaffold(
       floatingActionButton: homeMode == 'real'
@@ -59,120 +79,104 @@ class HomeScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+                padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
                 child: Row(
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '경공매 인사이트',
-                            style: TextStyle(
-                              fontSize: isDesktop ? 24 : 22,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.ink,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '서울·경기·인천 공매를 지도에서 탐색',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.ink.withValues(alpha: 0.55),
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        '경공매 인사이트',
+                        style: TextStyle(
+                          fontSize: isDesktop ? 20 : 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.ink,
+                          letterSpacing: -0.4,
+                        ),
                       ),
                     ),
                     IconButton(
                       tooltip: '필터',
+                      visualDensity: VisualDensity.compact,
                       onPressed: () => showFilterSheet(context, ref),
-                      icon: const Icon(Icons.tune),
+                      icon: Badge(
+                        isLabelVisible: extraFilters.isNotEmpty,
+                        smallSize: 8,
+                        child: const Icon(Icons.tune, size: 22),
+                      ),
                     ),
                     IconButton(
                       tooltip: '초보 가이드',
+                      visualDensity: VisualDensity.compact,
                       onPressed: () => context.push('/guide'),
-                      icon: const Icon(Icons.menu_book_outlined),
+                      icon: const Icon(Icons.menu_book_outlined, size: 22),
                     ),
                     IconButton(
                       tooltip: '설정',
+                      visualDensity: VisualDensity.compact,
                       onPressed: () => context.push('/settings'),
-                      icon: const Icon(Icons.settings_outlined),
+                      icon: const Icon(Icons.settings_outlined, size: 22),
                     ),
                   ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final (key, label) in const [
-                        ('real', '실거래'),
-                        ('court', '법원경매'),
-                        ('onbid', '온비드공매'),
-                      ])
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(label),
-                            selected: homeMode == key,
-                            onSelected: (_) async {
-                              if (key == 'real') {
-                                final uri = Uri.parse(
-                                  'https://map-estate-uz70.onrender.com',
-                                );
-                                await launchUrl(
-                                  uri,
-                                  mode: LaunchMode.externalApplication,
-                                );
-                                return;
-                              }
-                              ref.read(homeModeProvider.notifier).state = key;
-                              final cur = ref.read(filtersProvider);
-                              ref.read(filtersProvider.notifier).state =
-                                  cur.copyWith(
-                                sources: key == 'court'
-                                    ? ['court']
-                                    : ['onbid'],
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const RegionQuickBar(),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final s in filters.sources)
-                      Chip(
-                        label: Text(s == 'court' ? '경매' : '공매'),
-                        visualDensity: VisualDensity.compact,
+                    if (isDesktop)
+                      Row(
+                        children: [
+                          SegmentPills(
+                            selectedKey: homeMode,
+                            options: const [
+                              ('real', '실거래'),
+                              ('court', '법원'),
+                              ('onbid', '온비드'),
+                            ],
+                            onSelected: (k) => _setHomeMode(ref, k),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            margin: const EdgeInsets.symmetric(horizontal: 12),
+                            color: AppTheme.line,
+                          ),
+                          const Expanded(
+                            child: RegionQuickBar(sidoOnly: true),
+                          ),
+                        ],
+                      )
+                    else ...[
+                      SegmentPills(
+                        selectedKey: homeMode,
+                        options: const [
+                          ('real', '실거래'),
+                          ('court', '법원'),
+                          ('onbid', '온비드'),
+                        ],
+                        onSelected: (k) => _setHomeMode(ref, k),
                       ),
-                    for (final u in filters.usages)
-                      Chip(
-                        label: Text(usageChipLabel(u)),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    if (filters.minFailCount != null)
-                      Chip(
-                        label: Text('유찰 ${filters.minFailCount}+'),
-                        visualDensity: VisualDensity.compact,
-                      ),
+                      const SizedBox(height: 8),
+                      const RegionQuickBar(sidoOnly: true),
+                    ],
+                    // District chips only when a sido is active
+                    if (activeSido != null) ...[
+                      const SizedBox(height: 8),
+                      const RegionDistrictBar(),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              if (extraFilters.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: extraFilters,
+                  ),
+                ),
+              const SizedBox(height: 10),
               Expanded(
                 child: search.when(
                   loading: () =>
@@ -204,10 +208,10 @@ class HomeScreen extends ConsumerWidget {
 
                     final listHeader = Padding(
                       padding: EdgeInsets.fromLTRB(
-                        isDesktop ? 16 : 20,
-                        isDesktop ? 8 : 12,
-                        isDesktop ? 16 : 20,
-                        4,
+                        isDesktop ? 14 : 16,
+                        isDesktop ? 10 : 8,
+                        isDesktop ? 14 : 16,
+                        6,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -217,7 +221,8 @@ class HomeScreen extends ConsumerWidget {
                               Text(
                                 '${result.total}건',
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -235,30 +240,18 @@ class HomeScreen extends ConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                for (final (key, label) in const [
-                                  ('score', '추천순'),
-                                  ('deadline', '마감임박'),
-                                  ('discount', '할인율'),
-                                ])
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 6),
-                                    child: ChoiceChip(
-                                      label: Text(label),
-                                      selected: filters.sort == key,
-                                      visualDensity: VisualDensity.compact,
-                                      onSelected: (_) {
-                                        ref
-                                            .read(filtersProvider.notifier)
-                                            .state = filters.copyWith(sort: key);
-                                      },
-                                    ),
-                                  ),
-                              ],
-                            ),
+                          SegmentPills(
+                            dense: true,
+                            selectedKey: filters.sort,
+                            options: const [
+                              ('score', '추천순'),
+                              ('deadline', '마감임박'),
+                              ('discount', '할인율'),
+                            ],
+                            onSelected: (key) {
+                              ref.read(filtersProvider.notifier).state =
+                                  filters.copyWith(sort: key);
+                            },
                           ),
                         ],
                       ),
@@ -340,6 +333,32 @@ class HomeScreen extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveFilterChip extends StatelessWidget {
+  const _ActiveFilterChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.slate.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.slate.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.slate,
         ),
       ),
     );
