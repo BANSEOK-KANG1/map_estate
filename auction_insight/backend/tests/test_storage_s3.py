@@ -64,16 +64,10 @@ def test_get_store_s3_kind(monkeypatch):
 
 
 def test_auth_write_detection(monkeypatch):
-    from app.analysis.auth import _is_analysis_write, analysis_api_key
+    from app.analysis.auth import analysis_api_key, is_analysis_write
 
     monkeypatch.setenv("ANALYSIS_API_KEY", "secret")
     assert analysis_api_key() == "secret"
-
-    class _Req:
-        def __init__(self, method: str, path: str):
-            self.method = method
-            self.url = type("U", (), {"path": path})()
-
-    assert _is_analysis_write(_Req("POST", "/api/analysis/items")) is True
-    assert _is_analysis_write(_Req("GET", "/api/analysis/items")) is False
-    assert _is_analysis_write(_Req("POST", "/api/analysis/money/validate")) is False
+    assert is_analysis_write("POST", "/api/analysis/items") is True
+    assert is_analysis_write("GET", "/api/analysis/items") is False
+    assert is_analysis_write("POST", "/api/analysis/money/validate") is False

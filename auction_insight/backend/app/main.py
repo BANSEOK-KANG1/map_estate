@@ -227,10 +227,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Auction Insight API", version="0.1.0", lifespan=lifespan)
-    from app.analysis.auth import AnalysisApiKeyMiddleware
+    from app.analysis.auth import build_analysis_api_key_middleware
 
     app.add_middleware(SecurityHeadersMiddleware)
-    app.add_middleware(AnalysisApiKeyMiddleware)
+    app.add_middleware(build_analysis_api_key_middleware())
     app.add_middleware(PrivateNetworkCorsMiddleware)
     app.add_middleware(
         CORSMiddleware,
