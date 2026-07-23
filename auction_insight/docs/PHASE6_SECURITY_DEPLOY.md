@@ -8,9 +8,10 @@
 - [x] 주민번호·연락처 저장 전 마스킹 (`pii.mask_pii`)
 - [x] 보안 헤더: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
 - [x] `/api/*` `Cache-Control: no-store`
-- [x] DocumentStore 추상화 (local ↔ s3 stub). 운영은 `ANALYSIS_DOC_STORE=s3` + `ANALYSIS_S3_BUCKET`
-- [ ] S3 put/get 실제 구현 (자격 증명 준비 후)
-- [ ] 인증/인가 (현재 공개 MVP — 추후)
+- [x] DocumentStore 추상화 (local ↔ s3). 운영은 `ANALYSIS_DOC_STORE=s3|r2` + bucket/creds
+- [x] S3/R2 put/get/delete (`boto3`, `ANALYSIS_S3_ENDPOINT_URL`로 R2/MinIO)
+- [x] 선택적 `ANALYSIS_API_KEY` → 분석 쓰기 API에 `X-API-Key` 요구
+- [ ] 사용자 로그인/인가 (공개 MVP — 추후)
 
 ## 테스트
 
@@ -34,9 +35,12 @@ cd app && flutter test
    - 물건 상세 → **심층 분석 열기**
    - 문서함 TXT 업로드 → 마스킹·분류
 4. 환경변수 (권장):
-   - `ANALYSIS_DOC_STORE=local` (현재) → 추후 `s3`
+   - `ANALYSIS_DOC_STORE=local` (기본) → 운영 `s3` 또는 `r2`
    - `ANALYSIS_DOC_ROOT` (local 경로)
-   - `ANALYSIS_S3_BUCKET` / `ANALYSIS_S3_PREFIX` (s3 전환 시)
+   - `ANALYSIS_S3_BUCKET` / `ANALYSIS_S3_PREFIX` / `ANALYSIS_S3_REGION`
+   - `ANALYSIS_S3_ENDPOINT_URL` (R2·MinIO)
+   - `ANALYSIS_S3_ACCESS_KEY` / `ANALYSIS_S3_SECRET_KEY`
+   - `ANALYSIS_API_KEY` (설정 시 분석 쓰기 API에 `X-API-Key` 필수)
 
 ## 제품 원칙 (회귀 금지)
 
