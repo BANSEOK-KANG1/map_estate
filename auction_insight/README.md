@@ -16,6 +16,14 @@ Flutter + FastAPI로 **법원 경매·캠코 공매** 물건을 지도에서 보
 
 AI는 입찰을 결정하지 않으며, 필수문서 부족 시 권리 확정 금지·초보자 입찰 금지를 표시합니다.
 
+### 옵시디언 — 스크리닝 점수·가중치
+
+정보 enrich 시 쓰는 할인·POI·마감·종합점수 공식 정리:
+
+- 볼트 폴더: [docs/obsidian-vault](docs/obsidian-vault)  
+- Obsidian에서 **Open folder as vault** → 해당 폴더  
+- 시작 노트: `00-스크리닝-점수-MOC.md`
+
 ## 구조
 
 ```

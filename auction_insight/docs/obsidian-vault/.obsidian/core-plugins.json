@@ -1,0 +1,7 @@
+{
+  "graph": true,
+  "outgoing-link": true,
+  "backlink": true,
+  "tag-pane": true,
+  "outline": true
+}
