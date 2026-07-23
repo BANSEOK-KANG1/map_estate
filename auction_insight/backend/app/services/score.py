@@ -26,14 +26,20 @@ def discount_ratio(min_bid: int | None, base: int | None) -> float | None:
 def discount_to_score(ratio: float | None) -> float | None:
     """Map discount ratio → 0..100. None = 결측(가중치에서 제외).
 
-    구버전(40+150×r, 40%에서 포화)은 공매 전형 할인대에서 전부 100으로 뭉쳤다.
-    0~80% 구간을 선형에 가깝게 펼친다.
+    선형(18+100r)은 80%~90% 공매 구간에서 다시 98로 포화했다.
+    가격배수 m=감정/최저 = 1/(1-r)의 log10으로 딥할인대를 펼친다.
     """
+    import math
+
     if ratio is None:
         return None
-    r = max(-0.2, min(1.0, float(ratio)))
-    # 0%→18, 20%→38, 40%→58, 50%→68, 60%→78, 80%→98
-    return round(max(5.0, min(98.0, 18.0 + r * 100.0)), 1)
+    r = max(-0.2, min(0.995, float(ratio)))
+    if r <= 0:
+        return round(max(5.0, 18.0 + r * 50.0), 1)
+    m = 1.0 / (1.0 - r)
+    # m=1.25(20%)≈20, m=2(50%)≈32, m=5(80%)≈54, m=10(90%)≈70, m=20(95%)≈87
+    raw = 15.0 + 55.0 * math.log10(m)
+    return round(max(5.0, min(98.0, raw)), 1)
 
 
 def infrastructure_score(pois: list[PoiCache]) -> float:
@@ -63,7 +69,7 @@ def infrastructure_score(pois: list[PoiCache]) -> float:
 
 
 def urgency_score(bid_end_at: datetime | None, now: datetime | None = None) -> float | None:
-    """Closer deadline → higher urgency (5..100). None if unknown.
+    """Closer deadline → higher urgency (2..100). None if unknown.
 
     구버전은 ≥30일이면 전부 10점이라 D-40~D-120이 구분되지 않았다.
     """
@@ -74,9 +80,9 @@ def urgency_score(bid_end_at: datetime | None, now: datetime | None = None) -> f
     if delta.total_seconds() <= 0:
         return 100.0
     days = delta.total_seconds() / 86400.0
-    # half-life ≈ 18일: 0→100, 7→76, 14→58, 30→32, 60→10, 90→5
+    # half-life ≈ 18일: 0→100, 7→76, 14→58, 30→32, 60→10, 90→3, 120→2
     raw = 100.0 * (0.5 ** (days / 18.0))
-    return round(max(5.0, min(100.0, raw)), 1)
+    return round(max(2.0, min(100.0, raw)), 1)
 
 
 def fail_count_score(fail_count: int | None) -> float | None:

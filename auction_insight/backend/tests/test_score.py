@@ -12,14 +12,14 @@ from app.services.score import (
 
 
 def test_discount_curve_spreads_typical_auction_range():
-    """40%~60% 할인이 전부 100으로 포화되지 않아야 한다."""
-    s40 = discount_to_score(0.40)
+    """딥할인대(50/80/90%)도 서로 벌어져야 한다."""
     s50 = discount_to_score(0.50)
-    s60 = discount_to_score(0.60)
-    assert s40 is not None and s50 is not None and s60 is not None
-    assert s40 < s50 < s60
-    assert s40 < 70
-    assert s60 < 95
+    s80 = discount_to_score(0.80)
+    s90 = discount_to_score(0.90)
+    assert s50 is not None and s80 is not None and s90 is not None
+    assert s50 < s80 < s90
+    assert s90 - s80 >= 10.0
+    assert s80 < 90
 
 
 def test_missing_market_no_longer_collapses_to_44():
@@ -37,8 +37,7 @@ def test_missing_market_no_longer_collapses_to_44():
     )
     assert insight.total is not None
     assert insight.total != 44.0
-    # Should sit in a usable mid-high band, not a flat floor
-    assert 45.0 <= insight.total <= 85.0
+    assert 25.0 <= insight.total <= 85.0
 
 
 def test_different_discounts_rank_differently():
@@ -72,7 +71,7 @@ def test_urgency_distinguishes_far_deadlines():
     u90 = urgency_score(now + timedelta(days=90), now=now)
     assert u40 is not None and u90 is not None
     assert u40 > u90
-    assert u90 >= 5.0
+    assert u90 >= 2.0
 
 
 def test_fail_count_score_monotonic():
