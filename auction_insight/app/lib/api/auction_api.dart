@@ -41,7 +41,8 @@ class AuctionApi {
                 baseUrl: AppConfig.apiBaseUrl,
                 connectTimeout: const Duration(seconds: 15),
                 receiveTimeout: const Duration(seconds: 120),
-                headers: {'Content-Type': 'application/json'},
+                // Do not set Content-Type globally — it breaks multipart
+                // document uploads (server returns 422 Field required).
               ),
             );
 
@@ -204,7 +205,12 @@ class AuctionApi {
       'file': MultipartFile.fromBytes(bytes, filename: filename),
       if (docType != null) 'doc_type': docType,
     });
-    final res = await _dio.post('/api/analysis/items/$itemId/documents', data: form);
+    // Explicitly clear Content-Type so Dio can set multipart boundary.
+    final res = await _dio.post(
+      '/api/analysis/items/$itemId/documents',
+      data: form,
+      options: Options(headers: {Headers.contentTypeHeader: null}),
+    );
     return Map<String, dynamic>.from(res.data as Map);
   }
 

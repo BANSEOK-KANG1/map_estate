@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -928,10 +931,90 @@ class _DocsTabState extends ConsumerState<_DocsTab> {
     if (pick == null || pick.files.isEmpty) return;
     final f = pick.files.first;
     final bytes = f.bytes;
-    if (bytes == null) {
-      setState(() => _msg = '웹에서는 파일 바이트를 읽지 못했습니다. 다시 시도하세요.');
+    if (bytes == null || bytes.isEmpty) {
+      setState(() => _msg = '파일을 읽지 못했습니다. TXT 붙여넣기를 사용하거나 다시 시도하세요.');
       return;
     }
+    await _sendBytes(
+      bytes: bytes,
+      filename: f.name.isEmpty ? 'upload.pdf' : f.name,
+      docType: docType,
+    );
+  }
+
+  Future<void> _pasteText({String? docType}) async {
+    final controller = TextEditingController();
+    final nameCtrl = TextEditingController(
+      text: switch (docType) {
+        'registry' => '등기부등본.txt',
+        'appraisal' => '감정평가서.txt',
+        'onbid_notice' => '공고문.txt',
+        _ => '문서.txt',
+      },
+    );
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('텍스트로 문서 등록'),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: '파일명 (.txt)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: controller,
+                maxLines: 10,
+                decoration: const InputDecoration(
+                  labelText: '본문 붙여넣기',
+                  hintText: '등기·감정·공고 텍스트를 붙여넣으세요',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('등록'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final text = controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _msg = '본문이 비어 있습니다.');
+      return;
+    }
+    var name = nameCtrl.text.trim();
+    if (name.isEmpty) name = '문서.txt';
+    if (!name.toLowerCase().endsWith('.txt')) name = '$name.txt';
+    await _sendBytes(
+      bytes: utf8.encode(text),
+      filename: name,
+      docType: docType,
+    );
+  }
+
+  Future<void> _sendBytes({
+    required List<int> bytes,
+    required String filename,
+    String? docType,
+  }) async {
     setState(() {
       _busy = true;
       _msg = null;
@@ -940,13 +1023,24 @@ class _DocsTabState extends ConsumerState<_DocsTab> {
       await ref.read(apiProvider).uploadAnalysisDocument(
             widget.itemId,
             bytes: bytes,
-            filename: f.name,
+            filename: filename,
             docType: docType,
           );
       ref.invalidate(_analysisProvider(widget.itemId));
+      if (!mounted) return;
       setState(() => _msg = '업로드·추출·마스킹 완료');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('문서 업로드 완료')),
+      );
     } catch (e) {
-      setState(() => _msg = '실패: $e');
+      final detail = e is DioException
+          ? (e.response?.data?.toString() ?? e.message ?? '$e')
+          : '$e';
+      if (!mounted) return;
+      setState(() => _msg = '실패: $detail');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('업로드 실패: $detail')),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1049,12 +1143,20 @@ class _DocsTabState extends ConsumerState<_DocsTab> {
               child: Text(_busy ? '처리 중…' : 'PDF/TXT 업로드'),
             ),
             OutlinedButton(
+              onPressed: _busy ? null : () => _pasteText(),
+              child: const Text('텍스트 붙여넣기'),
+            ),
+            OutlinedButton(
               onPressed: _busy ? null : () => _upload(docType: 'registry'),
               child: const Text('등기로 업로드'),
             ),
             OutlinedButton(
               onPressed: _busy ? null : () => _upload(docType: 'appraisal'),
               child: const Text('감정으로 업로드'),
+            ),
+            OutlinedButton(
+              onPressed: _busy ? null : () => _pasteText(docType: 'onbid_notice'),
+              child: const Text('공고 텍스트'),
             ),
           ],
         ),
