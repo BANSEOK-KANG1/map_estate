@@ -15,7 +15,7 @@ from app.models import AuctionLot, AuctionSchedule, PoiCache
 from app.schemas import IngestResponse
 from app.services.enrich import enrich_lots
 from app.services.lots import match_region_code, seed_regions
-from app.services.score import combine_insight, discount_ratio, urgency_score
+from app.services.score import apply_lot_scores
 
 router = APIRouter(prefix="/demo", tags=["demo"])
 
@@ -72,19 +72,8 @@ async def _upsert_from_catalog(session, raw: dict) -> AuctionLot:
             lot.market_median_manwon / (lot.exclusive_area / 3.3058), 1
         )
 
-    lot.discount_vs_appraisal = discount_ratio(lot.min_bid_manwon, lot.appraisal_manwon)
-    lot.discount_vs_market = discount_ratio(lot.min_bid_manwon, lot.market_median_manwon)
-    infra = float(raw.get("infra") or 60.0)
-    urg = urgency_score(lot.bid_end_at)
-    insight = combine_insight(
-        lot.discount_vs_appraisal,
-        lot.discount_vs_market,
-        infra,
-        urg,
-    )
-    lot.infra_score = insight.infra
-    lot.urgency_score = insight.urgency
-    lot.total_score = insight.total
+    lot.infra_score = float(raw.get("infra") or 60.0)
+    apply_lot_scores(lot)
 
     await session.flush()
 

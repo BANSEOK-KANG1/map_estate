@@ -11,7 +11,7 @@ from app.ingest.molit_market import estimate_market_for_lot
 from app.ingest.onbid_detail import enrich_lot_onbid_detail
 from app.models import AuctionLot
 from app.services.kakao import ensure_lot_coords, get_or_fetch_pois
-from app.services.score import combine_insight, discount_ratio, infrastructure_score, urgency_score
+from app.services.score import apply_lot_scores, infrastructure_score
 
 logger = logging.getLogger(__name__)
 
@@ -46,19 +46,10 @@ async def enrich_lot(
         except Exception:  # noqa: BLE001
             logger.exception("market estimate failed for lot %s", lot.id)
 
-    lot.discount_vs_appraisal = discount_ratio(lot.min_bid_manwon, lot.appraisal_manwon)
-    lot.discount_vs_market = discount_ratio(lot.min_bid_manwon, lot.market_median_manwon)
-    infra = infrastructure_score(pois) if pois else (lot.infra_score or 0.0)
-    urgency = urgency_score(lot.bid_end_at)
-    insight = combine_insight(
-        lot.discount_vs_appraisal,
-        lot.discount_vs_market,
-        infra,
-        urgency,
-    )
-    lot.infra_score = insight.infra
-    lot.urgency_score = insight.urgency
-    lot.total_score = insight.total
+    if pois:
+        lot.infra_score = infrastructure_score(pois)
+    # infra_score stays None when POI not fetched → excluded from weight
+    apply_lot_scores(lot)
 
     subway = next((p for p in pois if p.category == "subway"), None)
     if subway and subway.payload_json:

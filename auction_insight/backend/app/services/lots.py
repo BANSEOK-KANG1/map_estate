@@ -25,19 +25,23 @@ from app.schemas import (
     SearchRequest,
 )
 from app.services.kakao import POI_CATEGORIES
-from app.services.score import combine_insight
+from app.services.score import apply_lot_scores
 
 SOURCE_LABELS = {"onbid": "공매", "court": "경매"}
 CATEGORY_LABELS = {v[0]: v[1] for v in POI_CATEGORIES.values()}
 
 
 def _scores_from_lot(lot: AuctionLot) -> InsightScore:
-    return InsightScore(
-        discount_vs_appraisal=lot.discount_vs_appraisal,
-        discount_vs_market=lot.discount_vs_market,
-        infra=lot.infra_score,
-        urgency=lot.urgency_score,
-        total=lot.total_score,
+    from app.services.score import score_from_fields
+
+    # Live recompute so algorithm changes show immediately in list/detail.
+    return score_from_fields(
+        min_bid_manwon=lot.min_bid_manwon,
+        appraisal_manwon=lot.appraisal_manwon,
+        market_median_manwon=lot.market_median_manwon,
+        infra_score=lot.infra_score,
+        bid_end_at=lot.bid_end_at,
+        fail_count=lot.fail_count,
     )
 
 
@@ -418,7 +422,37 @@ def to_detail(lot: AuctionLot) -> LotDetail:
     )
 
 
+async def rescore_lots(
+    session: AsyncSession,
+    *,
+    only_missing: bool = False,
+    limit: int = 8000,
+) -> int:
+    """Persist screening scores from price/deadline/fail fields (no external API)."""
+    stmt = select(AuctionLot).order_by(AuctionLot.id.asc()).limit(limit)
+    if only_missing:
+        stmt = select(AuctionLot).where(AuctionLot.total_score.is_(None)).limit(limit)
+    rows = (await session.execute(stmt)).scalars().all()
+    for lot in rows:
+        apply_lot_scores(lot)
+    if rows:
+        await session.commit()
+    return len(rows)
+
+
 async def search_lots(session: AsyncSession, req: SearchRequest) -> tuple[int, list[LotSummary]]:
+    # Ensure sort-by-score works even before Kakao/MOLIT enrich.
+    missing = (
+        await session.execute(
+            select(func.count(AuctionLot.id)).where(AuctionLot.total_score.is_(None))
+        )
+    ).scalar_one()
+    if missing:
+        await rescore_lots(session, only_missing=True)
+    elif not getattr(search_lots, "_full_rescore_done", False):
+        # Once per process after deploy: rewrite totals with new algorithm.
+        await rescore_lots(session, only_missing=False)
+        setattr(search_lots, "_full_rescore_done", True)
     q = select(AuctionLot).options(selectinload(AuctionLot.region))
     count_q = select(func.count(AuctionLot.id))
 

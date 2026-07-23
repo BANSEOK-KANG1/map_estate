@@ -17,7 +17,14 @@ from app.schemas import (
     SearchResponse,
 )
 from app.services.enrich import enrich_lot, enrich_lots
-from app.services.lots import get_lot, get_lot_by_key, search_lots, seed_regions, to_detail
+from app.services.lots import (
+    get_lot,
+    get_lot_by_key,
+    rescore_lots,
+    search_lots,
+    seed_regions,
+    to_detail,
+)
 
 router = APIRouter(tags=["api"])
 
@@ -153,6 +160,21 @@ async def enrich_existing(
             f"missing_coords_only={req.missing_coords_only}, "
             f"balance_by_sido={req.balance_by_sido})"
         ),
+    )
+
+
+@router.post("/rescore", response_model=IngestResponse)
+async def rescore_existing(
+    db: AsyncSession = Depends(get_db),
+    only_missing: bool = False,
+) -> IngestResponse:
+    """Recompute screening scores from appraisal/market/deadline/fail (no external API)."""
+    n = await rescore_lots(db, only_missing=only_missing)
+    return IngestResponse(
+        status="ok",
+        lot_count=n,
+        enriched=n,
+        message=f"rescored {n} lots (only_missing={only_missing})",
     )
 
 

@@ -14,6 +14,7 @@ class InsightScore(BaseModel):
     discount_vs_market: float | None = None
     infra: float | None = None
     urgency: float | None = None
+    fail: float | None = None
     total: float | None = None
 
 

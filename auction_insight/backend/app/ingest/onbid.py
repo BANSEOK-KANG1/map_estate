@@ -424,6 +424,9 @@ async def upsert_onbid_lot(session: AsyncSession, raw: dict[str, Any]) -> Auctio
         sched.sale_date = lot.sale_date
         sched.min_bid_manwon = lot.min_bid_manwon
         sched.result = "진행"
+    from app.services.score import apply_lot_scores
+
+    apply_lot_scores(lot)
     return lot
 
 

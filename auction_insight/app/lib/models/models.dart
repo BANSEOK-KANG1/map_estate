@@ -17,6 +17,7 @@ class InsightScore {
   final double? discountVsMarket;
   final double? infra;
   final double? urgency;
+  final double? fail;
   final double? total;
 
   const InsightScore({
@@ -24,6 +25,7 @@ class InsightScore {
     this.discountVsMarket,
     this.infra,
     this.urgency,
+    this.fail,
     this.total,
   });
 
@@ -34,6 +36,7 @@ class InsightScore {
       discountVsMarket: (json['discount_vs_market'] as num?)?.toDouble(),
       infra: (json['infra'] as num?)?.toDouble(),
       urgency: (json['urgency'] as num?)?.toDouble(),
+      fail: (json['fail'] as num?)?.toDouble(),
       total: (json['total'] as num?)?.toDouble(),
     );
   }
